@@ -1,0 +1,80 @@
+name: p0w-harness-v1.6
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      # v1.3 8 checks (Sprint 0 T-001 will flesh these out)
+      - run: pnpm harness:no-public-sensitive-fields
+      - run: pnpm harness:no-naver-storage
+      - run: pnpm harness:no-image-storage
+      - run: pnpm harness:tos-whitelist
+      - run: pnpm harness:public-copy-wording
+      - run: pnpm harness:dispute-status-server-only
+      - run: pnpm harness:summary-copy-rate
+      - run: pnpm harness:db-grants
+
+      # v1.5 7 checks
+      - run: pnpm harness:widget-contract
+      - run: pnpm harness:source-provenance
+      - run: pnpm harness:realtime-naming
+      - run: pnpm harness:sample-quality-copy
+      - run: pnpm harness:monetization-claims
+      - run: pnpm harness:analytics-events
+      - run: pnpm harness:surface-consistency
+
+      # v1.6 3 checks — critical
+      - name: Harness — ad zone boundary (v1.6)
+        run: pnpm harness:ad-zone-boundary
+
+      - name: Harness — affiliate link provenance (v1.6)
+        run: pnpm harness:affiliate-link-provenance
+
+      - name: Harness — native widget entry condition (v1.6)
+        run: pnpm harness:native-widget-entry-condition
+        env:
+          POSTHOG_PERSONAL_API_KEY: ${{ secrets.POSTHOG_PERSONAL_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Eval — summary copy ratio
+        run: pnpm eval:summary
+
+      - name: Harness summary
+        if: always()
+        run: echo "Harness run complete — 18 checks executed (P0w placeholders)."

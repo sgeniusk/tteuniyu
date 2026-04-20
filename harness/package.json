@@ -1,0 +1,47 @@
+{
+  "name": "@tteuniyu/harness",
+  "version": "0.0.0",
+  "private": true,
+  "description": "PRD v1.6 harness — 18 checks enforced on CI. See checks/README.md",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint checks",
+    "test": "vitest run",
+    "all": "tsx scripts/run-all.ts",
+    "regression": "tsx scripts/regression-suite.ts",
+    "eval:summary": "tsx scripts/eval-summary.ts",
+    "check:no-public-sensitive-fields": "tsx checks/assert-no-public-sensitive-fields.ts",
+    "check:no-naver-storage": "tsx checks/assert-no-naver-storage.ts",
+    "check:no-image-storage": "tsx checks/assert-no-image-storage.ts",
+    "check:tos-whitelist": "tsx checks/assert-tos-whitelist.ts",
+    "check:public-copy-wording": "tsx checks/assert-public-copy-wording.ts",
+    "check:dispute-status-server-only": "tsx checks/assert-dispute-status-server-only.ts",
+    "check:summary-copy-rate": "tsx checks/assert-summary-copy-rate.ts",
+    "check:db-grants": "tsx checks/assert-db-grants.ts",
+    "check:widget-contract": "tsx checks/assert-widget-contract.ts",
+    "check:source-provenance": "tsx checks/assert-source-provenance.ts",
+    "check:realtime-naming": "tsx checks/assert-realtime-naming.ts",
+    "check:sample-quality-copy": "tsx checks/assert-sample-quality-copy.ts",
+    "check:monetization-claims": "tsx checks/assert-monetization-claims.ts",
+    "check:analytics-events": "tsx checks/assert-analytics-events.ts",
+    "check:surface-consistency": "tsx checks/assert-surface-consistency.ts",
+    "check:ad-zone-boundary": "tsx checks/assert-ad-zone-boundary.ts",
+    "check:affiliate-link-provenance": "tsx checks/assert-affiliate-link-provenance.ts",
+    "check:native-widget-entry-condition": "tsx checks/assert-native-widget-entry-condition.ts"
+  },
+  "dependencies": {
+    "zod": "^3.24.1",
+    "yaml": "^2.6.1",
+    "glob": "^11.0.0"
+  },
+  "devDependencies": {
+    "@babel/parser": "^7.26.0",
+    "@babel/traverse": "^7.26.0",
+    "@types/babel__traverse": "^7.20.6",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,0 +1,61 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env*.local
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Editor
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+.DS_Store
+
+# Test
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Supabase
+supabase/.branches/
+supabase/.temp/
+
+# Vercel
+.vercel
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Native (future)
+apps/ios/build/
+apps/ios/DerivedData/
+apps/android/build/
+apps/android/.gradle/
+*.xcuserstate
+
+# Harness outputs
+harness/reports/
+harness/.cache/
+
+# Temporary
+*.tmp
+*.swp
+*.bak

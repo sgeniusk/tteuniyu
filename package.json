@@ -1,0 +1,48 @@
+{
+  "name": "tteuniyu",
+  "version": "0.0.0",
+  "private": true,
+  "description": "뜬이유 — Widget-shaped Revenue MVP (PRD v1.6 확정본)",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm --filter @tteuniyu/web dev",
+    "build": "pnpm -r build",
+    "start": "pnpm --filter @tteuniyu/web start",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @tteuniyu/web test:e2e",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "harness:all": "pnpm --filter @tteuniyu/harness all",
+    "harness:no-public-sensitive-fields": "pnpm --filter @tteuniyu/harness check:no-public-sensitive-fields",
+    "harness:no-naver-storage": "pnpm --filter @tteuniyu/harness check:no-naver-storage",
+    "harness:no-image-storage": "pnpm --filter @tteuniyu/harness check:no-image-storage",
+    "harness:tos-whitelist": "pnpm --filter @tteuniyu/harness check:tos-whitelist",
+    "harness:public-copy-wording": "pnpm --filter @tteuniyu/harness check:public-copy-wording",
+    "harness:dispute-status-server-only": "pnpm --filter @tteuniyu/harness check:dispute-status-server-only",
+    "harness:summary-copy-rate": "pnpm --filter @tteuniyu/harness check:summary-copy-rate",
+    "harness:db-grants": "pnpm --filter @tteuniyu/harness check:db-grants",
+    "harness:widget-contract": "pnpm --filter @tteuniyu/harness check:widget-contract",
+    "harness:source-provenance": "pnpm --filter @tteuniyu/harness check:source-provenance",
+    "harness:realtime-naming": "pnpm --filter @tteuniyu/harness check:realtime-naming",
+    "harness:sample-quality-copy": "pnpm --filter @tteuniyu/harness check:sample-quality-copy",
+    "harness:monetization-claims": "pnpm --filter @tteuniyu/harness check:monetization-claims",
+    "harness:analytics-events": "pnpm --filter @tteuniyu/harness check:analytics-events",
+    "harness:surface-consistency": "pnpm --filter @tteuniyu/harness check:surface-consistency",
+    "harness:ad-zone-boundary": "pnpm --filter @tteuniyu/harness check:ad-zone-boundary",
+    "harness:affiliate-link-provenance": "pnpm --filter @tteuniyu/harness check:affiliate-link-provenance",
+    "harness:native-widget-entry-condition": "pnpm --filter @tteuniyu/harness check:native-widget-entry-condition",
+    "harness:regression-suite": "pnpm --filter @tteuniyu/harness regression",
+    "eval:summary": "pnpm --filter @tteuniyu/harness eval:summary"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "prettier": "^3.4.0",
+    "typescript": "^5.7.0"
+  }
+}
