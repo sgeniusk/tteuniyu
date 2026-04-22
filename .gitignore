@@ -40,6 +40,9 @@ supabase/.temp/
 # Vercel
 .vercel
 
+# OMC (oh-my-claudecode plugin metadata)
+.omc/
+
 # OS
 Thumbs.db
 .DS_Store
