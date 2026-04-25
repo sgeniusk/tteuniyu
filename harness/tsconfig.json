@@ -4,7 +4,7 @@
     "outDir": "./dist",
     "rootDir": ".",
     "types": ["node"],
-    "lib": ["ES2023"],
+    "lib": ["ES2023", "DOM"],
     "module": "ESNext",
     "noEmit": true
   },

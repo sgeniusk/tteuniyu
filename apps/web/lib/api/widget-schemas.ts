@@ -61,9 +61,16 @@ export const WidgetMediumResponseSchema = z.object({
 })
 export type WidgetMediumResponse = z.infer<typeof WidgetMediumResponseSchema>
 
-/** size=large → 5 clusters + methodology version + diversity index. */
+/**
+ * size=large → 10 clusters (Top 1~10) + methodology version + diversity index.
+ *
+ * v1.6.1 patch: capacity expanded 5 → 10. Rationale: the rising-issue
+ * widget is the primary click-driver into Coverage Distribution detail
+ * pages; doubling the visible surface roughly doubles entry probability
+ * without changing the data contract shape.
+ */
 export const WidgetLargeResponseSchema = z.object({
-  clusters: z.array(WidgetClusterSchema).length(5),
+  clusters: z.array(WidgetClusterSchema).length(10),
   methodology_version: z.string(),
   overall_diversity_index: z.number().min(0).max(1).nullable(),
   updated_at: z.string(),
