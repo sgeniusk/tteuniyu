@@ -31,14 +31,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm lint
+      # Lint deferred to Sprint 0 T-001 (ESLint config + flat-config setup).
+      # P0w T-W01 enforces correctness via typecheck + harness only.
+      # - name: Lint
+      #   run: pnpm lint
 
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Unit tests
-        run: pnpm test
+      # Unit tests deferred to Sprint 0 T-001 (Vitest scaffolding +
+      # first failing-test fixtures). P0w T-W01 has no test files.
+      # - name: Unit tests
+      #   run: pnpm test
 
       # v1.3 8 checks (Sprint 0 T-001 will flesh these out)
       - run: pnpm harness:no-public-sensitive-fields
