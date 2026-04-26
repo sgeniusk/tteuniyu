@@ -15,6 +15,22 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko" className="dark">
+      <head>
+        {/*
+          Pretendard Variable via jsDelivr.
+          Fallback chain in globals.css (system-ui, sans-serif) covers
+          poor-network first paint per Codex Task D.
+        */}
+        <link
+          rel="preconnect"
+          href="https://cdn.jsdelivr.net"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
+        />
+      </head>
       <body>{children}</body>
     </html>
   )
