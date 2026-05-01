@@ -14,6 +14,36 @@ export const SampleQualitySchema = z.enum([
 ])
 export type SampleQuality = z.infer<typeof SampleQualitySchema>
 
+/**
+ * Cluster category (v1.6.2 patch).
+ *
+ * Politics / society are split — coverage distribution (진보/중도/보수) is
+ * meaningful only for these two categories. Other categories ship the same
+ * coverage data through the API but the UI suppresses the bar (different
+ * visualization candidates land in V0.5).
+ */
+export const CategorySchema = z.enum([
+  'politics',
+  'society',
+  'economy',
+  'international',
+  'tech_science',
+  'culture_sports',
+  'lifestyle',
+])
+export type Category = z.infer<typeof CategorySchema>
+
+/** Categories where the 4-color Coverage Bar is rendered in /cluster/[id]. */
+export const COVERAGE_RELEVANT_CATEGORIES: readonly Category[] = [
+  'politics',
+  'society',
+] as const
+
+export function isCoverageRelevant(category: Category | undefined): boolean {
+  if (!category) return false
+  return (COVERAGE_RELEVANT_CATEGORIES as readonly Category[]).includes(category)
+}
+
 export const CoverageCountsSchema = z.object({
   progressive: z.number().int().nonnegative(),
   mixed: z.number().int().nonnegative(),
@@ -44,6 +74,10 @@ const ClusterCore = z.object({
   updated_at: z.string(),
   ad_allowed: z.boolean(),
   affiliate_slot: AffiliateSlotSchema.optional(),
+  // v1.6.2 patch — optional 1차 (forward-compatible). Required by P0a.
+  category: CategorySchema.optional(),
+  /** Previous-minute rank for trend arrow. null = new entry to top N. */
+  previous_rank: z.number().int().min(1).max(50).nullable().optional(),
 })
 
 /** A single cluster card returned in any size. */

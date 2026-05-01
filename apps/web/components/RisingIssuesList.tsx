@@ -10,7 +10,7 @@
 
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import {
   WidgetLargeResponseSchema,
   type WidgetLargeResponse,
@@ -103,12 +103,27 @@ export function RisingIssuesList({
 
       <ol
         aria-label="실시간 이슈 Top 10"
-        className="grid grid-cols-1 gap-4 md:grid-cols-2"
+        className="grid grid-cols-1 gap-1 md:grid-cols-2 md:gap-x-4 md:gap-y-1"
       >
         {data.clusters.map((cluster, idx) => (
-          <li key={cluster.cluster_id}>
-            <IssueCard cluster={cluster} rank={idx + 1} />
-          </li>
+          <Fragment key={cluster.cluster_id}>
+            <li>
+              <IssueCard cluster={cluster} rank={idx + 1} />
+            </li>
+            {/*
+              v1.6.2 patch — AdZone slot marker between rank 5 and 6.
+              T-W04 will replace this hidden <li/> with <AdZone slot="..."/>.
+              Kept hidden now so the layout stays stable when AdZone lands.
+            */}
+            {idx === 4 && (
+              <li
+                role="presentation"
+                aria-hidden="true"
+                data-ad-slot="rising-issues-mid"
+                className="hidden"
+              />
+            )}
+          </Fragment>
         ))}
       </ol>
     </>

@@ -1,7 +1,7 @@
 /**
  * /embed/iframe — Creator Embed iframe surface.
  *
- * PRD v1.6 §7.1 F-P0w-3.
+ * PRD v1.6 §7.1 F-P0w-3 + v1.6.2 patch.
  * Loaded by /embed/widget.js inside an iframe on installer's site.
  *
  * Constraints:
@@ -9,6 +9,8 @@
  *   via the script tag itself; iframe is a paint surface)
  * - Cards open in NEW TAB (target=_blank rel=noopener)
  * - NO AdZone, NO Pro/Creator/B2B CTAs (read-only embed)
+ * - **v1.6.2: NO Coverage Bar** (hidden on widget surfaces; only shown on
+ *   /cluster/[id] detail when category is politics/society)
  * - Dark mode default, design tokens shared with /widget
  * - CSP frame-ancestors * (P0w; V1 will whitelist)
  */
@@ -20,8 +22,7 @@ import {
   type WidgetLargeResponse,
   type WidgetCluster,
 } from '@/lib/api/widget-schemas'
-import { CoverageBar } from '@/components/CoverageBar'
-import { totalCoverage, relativeTime } from '@/lib/format'
+import { relativeTime } from '@/lib/format'
 import { EmbedSizeSchema, type EmbedSize } from '@/lib/embed/schemas'
 
 export const metadata: Metadata = {
@@ -45,7 +46,10 @@ function getOrigin(hdrs: Headers): string {
   return `${protocol}://${host}`
 }
 
-async function fetchClusters(origin: string, count: number): Promise<{
+async function fetchClusters(
+  origin: string,
+  count: number,
+): Promise<{
   data: WidgetLargeResponse
   slice: WidgetCluster[]
 }> {
@@ -86,7 +90,7 @@ export default async function EmbedIframePage({ searchParams }: EmbedPageProps) 
           </time>
         </header>
 
-        <ol aria-label="실시간 이슈" className="flex flex-col gap-2">
+        <ol aria-label="실시간 이슈" className="flex flex-col gap-1">
           {slice.map((cluster, idx) => (
             <li key={cluster.cluster_id}>
               <EmbedRow cluster={cluster} rank={idx + 1} origin={origin} />
@@ -113,6 +117,16 @@ export default async function EmbedIframePage({ searchParams }: EmbedPageProps) 
   )
 }
 
+type Trend = 'up' | 'down' | 'same' | 'new' | null
+
+function trendKind(rank: number, previous: number | null | undefined): Trend {
+  if (previous === null) return 'new'
+  if (previous === undefined) return null
+  if (previous > rank) return 'up'
+  if (previous < rank) return 'down'
+  return 'same'
+}
+
 function EmbedRow({
   cluster,
   rank,
@@ -122,33 +136,47 @@ function EmbedRow({
   rank: number
   origin: string
 }) {
-  const insufficient = cluster.sample_quality === 'insufficient_sample'
-  const total = totalCoverage(cluster.coverage)
+  const trend = trendKind(rank, cluster.previous_rank)
   return (
     <a
       href={`${origin}/cluster/${cluster.cluster_id}`}
       target="_blank"
       rel="noopener noreferrer"
-      className="block rounded-md border border-slate-800 bg-slate-900 px-3 py-2 transition-colors duration-fast hover:border-slate-700"
+      className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors duration-fast hover:bg-slate-900"
     >
-      <div className="flex items-baseline gap-2">
-        <span className="font-mono text-body-sm tabular-nums text-slate-500">
-          {String(rank).padStart(2, '0')}
+      <span
+        className={`w-6 shrink-0 text-center font-mono text-mono-md tabular-nums ${
+          rank <= 3 ? 'text-teal-400' : 'text-slate-500'
+        }`}
+        aria-label={`순위 ${rank}위`}
+      >
+        {rank}
+      </span>
+      <span className="line-clamp-1 flex-1 text-body-md font-medium text-slate-50">
+        {cluster.title}
+      </span>
+      {trend === 'up' && (
+        <span aria-label="상승" className="shrink-0 text-teal-500" title="순위 상승">
+          <svg
+            className="h-3 w-3"
+            viewBox="0 0 12 12"
+            fill="none"
+            aria-hidden="true"
+            role="presentation"
+          >
+            <path d="M6 2 L10 8 L7 8 L7 11 L5 11 L5 8 L2 8 Z" fill="currentColor" />
+          </svg>
         </span>
-        <span className="line-clamp-1 text-body-md font-medium text-slate-50">
-          {cluster.title}
+      )}
+      {trend === 'new' && (
+        <span
+          aria-label="신규 진입"
+          className="shrink-0 rounded-sm bg-amber-500/15 px-1.5 font-mono text-body-sm text-amber-400"
+          title="신규 진입"
+        >
+          NEW
         </span>
-      </div>
-      <div className="mt-1.5 flex items-center gap-2">
-        <CoverageBar
-          coverage={cluster.coverage}
-          insufficient={insufficient}
-          className="flex-1"
-        />
-        <span className="font-mono text-body-sm text-slate-500">
-          {insufficient ? '표본 부족' : `N=${total}`}
-        </span>
-      </div>
+      )}
     </a>
   )
 }
