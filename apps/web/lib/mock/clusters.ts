@@ -17,7 +17,7 @@
 
 import type { WidgetCluster, CoverageCounts, Category } from '@/lib/api/widget-schemas'
 
-interface SeedCluster {
+export interface SeedCluster {
   cluster_id: string
   title: string
   base_coverage: CoverageCounts
@@ -246,4 +246,27 @@ export function rotationDiversityIndex(now: Date): number {
   const drift = ((hash(minute, 999) % 100) - 50) / 1000
   const v = OVERALL_DIVERSITY_INDEX + drift
   return Math.max(0.4, Math.min(0.85, Number(v.toFixed(3))))
+}
+
+/**
+ * Lookup a SeedCluster by id (used by /api/v1/clusters/[id], v1.6.3).
+ * Returns undefined if no match.
+ */
+export function findSeedById(id: string): SeedCluster | undefined {
+  return POOL.find((s) => s.cluster_id === id)
+}
+
+/**
+ * Compute jittered coverage for a given cluster at the current minute,
+ * using the same hash basis as rotateClusters so detail page numbers
+ * match the widget surface.
+ */
+export function clusterCoverageAt(
+  seed: SeedCluster,
+  now: Date = new Date(),
+): CoverageCounts {
+  const minute = minuteEpoch(now)
+  // Use cluster_id-based index seed so detail counts don't shift with rank.
+  const idIdx = Number.parseInt(seed.cluster_id.slice(-6), 16) % POOL_SIZE
+  return applyJitter(seed.base_coverage, minute, idIdx)
 }
