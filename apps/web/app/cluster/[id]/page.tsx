@@ -21,6 +21,7 @@ import {
   ClusterDetailResponseSchema,
   type ClusterDetailResponse,
   type OutletReport,
+  type AiAnalysis,
 } from '@/lib/api/cluster-schemas'
 import { isCoverageRelevant, type Category } from '@/lib/api/widget-schemas'
 import { CoverageBar } from '@/components/CoverageBar'
@@ -124,21 +125,7 @@ export default async function ClusterPage({ params }: ClusterPageProps) {
           </div>
         </header>
 
-        <section
-          aria-label="AI 요약"
-          className="flex flex-col gap-3 rounded-lg border border-slate-800 bg-slate-900/60 p-5"
-        >
-          <h2 className="text-heading-md font-pretendard text-slate-50">
-            AI 요약
-          </h2>
-          <p className="text-body-md leading-relaxed text-slate-200">
-            {cluster.ai_summary}
-          </p>
-          <p className="text-body-sm text-slate-500">
-            P0w mock 요약입니다. P0a (T-005)에서 Claude Haiku 출력 + copy ratio ≤ 15% 검증으로
-            교체됩니다.
-          </p>
-        </section>
+        <AiAnalysisStack analysis={cluster.ai_analysis} />
 
         {showBar && (
           <CoverageDistributionPanel
@@ -310,6 +297,42 @@ function OutletRow({ report }: { report: OutletReport }) {
         ↗
       </span>
     </a>
+  )
+}
+
+function AiAnalysisStack({ analysis }: { analysis: AiAnalysis }) {
+  return (
+    <section aria-label="AI 분석" className="flex flex-col gap-3">
+      {analysis.subject && (
+        <article className="flex flex-col gap-2 rounded-lg border border-slate-800 bg-slate-900/40 p-5">
+          <header className="flex items-baseline gap-2">
+            <span aria-hidden="true">🪪</span>
+            <h2 className="text-heading-md font-pretendard text-slate-50">정체</h2>
+          </header>
+          <p className="text-body-md leading-relaxed text-slate-200">{analysis.subject}</p>
+        </article>
+      )}
+
+      <article className="flex flex-col gap-2 rounded-lg border border-teal-500/30 bg-teal-500/5 p-5">
+        <header className="flex items-baseline gap-2">
+          <span aria-hidden="true">🚀</span>
+          <h2 className="text-heading-md font-pretendard text-teal-100">왜 지금 떴는가</h2>
+        </header>
+        <p className="text-body-md leading-relaxed text-slate-100">{analysis.why_trending}</p>
+      </article>
+
+      <article className="flex flex-col gap-2 rounded-lg border border-slate-800 bg-slate-900/60 p-5">
+        <header className="flex items-baseline gap-2">
+          <span aria-hidden="true">📰</span>
+          <h2 className="text-heading-md font-pretendard text-slate-50">매체는 어떻게 다뤘나</h2>
+        </header>
+        <p className="text-body-md leading-relaxed text-slate-200">{analysis.coverage_summary}</p>
+        <p className="text-body-sm text-slate-500">
+          P0w mock 분석입니다. P0a (T-005)에서 Claude Haiku 출력 + copy ratio ≤ 15% 검증으로
+          교체됩니다.
+        </p>
+      </article>
+    </section>
   )
 }
 
