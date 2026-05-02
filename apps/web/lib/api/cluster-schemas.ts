@@ -37,13 +37,32 @@ export const OutletReportSchema = z.object({
 })
 export type OutletReport = z.infer<typeof OutletReportSchema>
 
+/**
+ * Structured AI analysis (v1.6.4 patch).
+ *
+ * Replaces the v1.6.3 single `ai_summary` field. Three-section split
+ * lets the detail page show:
+ *   1) "🪪 정체"  — what/who is this (optional, only when subject is named)
+ *   2) "🚀 왜 지금 떴는가" — trigger event
+ *   3) "📰 매체는 어떻게 다뤘나" — coverage facts + stance differences
+ *
+ * P0a (T-005) Claude Haiku prompt enforces the same JSON shape.
+ * Copy-ratio harness applies to `coverage_summary` only.
+ */
+export const AiAnalysisSchema = z.object({
+  subject: z.string().min(1).max(200).optional(),
+  why_trending: z.string().min(1).max(500),
+  coverage_summary: z.string().min(1).max(800),
+})
+export type AiAnalysis = z.infer<typeof AiAnalysisSchema>
+
 export const ClusterDetailResponseSchema = z.object({
   cluster_id: z.string().uuid(),
   title: z.string().min(1).max(60),
   category: CategorySchema,
   coverage: CoverageCountsSchema,
   sample_quality: SampleQualitySchema,
-  ai_summary: z.string().min(1).max(800),
+  ai_analysis: AiAnalysisSchema,
   outlets: z.array(OutletReportSchema).min(1).max(20),
   methodology_version: z.string(),
   updated_at: z.string(),

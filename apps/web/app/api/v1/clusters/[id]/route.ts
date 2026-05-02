@@ -101,7 +101,7 @@ export async function GET(
     category: seed.category,
     coverage: clusterCoverageAt(seed, now),
     sample_quality: seed.sample_quality,
-    ai_summary: detail.ai_summary,
+    ai_analysis: detail.ai_analysis,
     outlets,
     methodology_version: METHODOLOGY_VERSION,
     updated_at,
