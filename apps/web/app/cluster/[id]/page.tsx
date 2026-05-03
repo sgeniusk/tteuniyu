@@ -1,10 +1,20 @@
 /**
- * /cluster/[id] — Coverage Distribution detail (v1.6.3 patch).
+ * /cluster/[id] — Coverage Distribution detail (v1.6.5 patch).
  *
- * P0w: mock-rich page joining the widget seed + cluster details + outlets.
- * Real T-007 (P0a) swaps mock joins for Supabase reads.
+ * P0w: mock-rich page joining the widget seed + cluster details + outlets +
+ * deterministic trend windows. Real T-005/T-006/T-007 (P0a) swap mock joins
+ * for Supabase reads (articles + summaries + keyword_trends per ADR-008).
  *
  * Layer 3 in PRD v1.6 §1.3 — the Coverage Distribution surface.
+ *
+ * v1.6.5 card order:
+ *   ← back / header
+ *   📺 영상 뉴스 (optional, YouTube Lite Embed)
+ *   🚀 왜 지금 떴는가 (teal accent)
+ *   📰 매체는 어떻게 다뤘나 (+ Coverage Bar panel for politics/society)
+ *   🧠 AI 정밀 분석 (entity_card + 4-window trend sparklines)
+ *   매체별 보도 list
+ *   P12 footer
  *
  * Constraints (CLAUDE.md / PRD v1.6):
  * - rule 12 (P12) Revenue Zone Isolation: NO `<AdZone>`, `<AffiliateCard>`,
@@ -20,11 +30,15 @@ import { headers } from 'next/headers'
 import {
   ClusterDetailResponseSchema,
   type ClusterDetailResponse,
+  type EntityCard,
   type OutletReport,
-  type AiAnalysis,
+  type TrendAnalysis,
+  type TrendWindow,
 } from '@/lib/api/cluster-schemas'
 import { isCoverageRelevant, type Category } from '@/lib/api/widget-schemas'
 import { CoverageBar } from '@/components/CoverageBar'
+import { TrendSparkline } from '@/components/TrendSparkline'
+import { YouTubeEmbed } from '@/components/YouTubeEmbed'
 import { relativeTime, totalCoverage } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -65,11 +79,18 @@ const STANCE_TEXT_CLASS = {
   foreign: 'text-coverage-foreign',
 } as const
 
+const WINDOW_LABEL: Record<TrendWindow['window'], string> = {
+  '7d': '지난 7일',
+  '30d': '지난 30일',
+  '6m': '지난 6개월',
+  '1y': '지난 1년',
+}
+
 export async function generateMetadata({ params }: ClusterPageProps): Promise<Metadata> {
   return {
     title: `이슈 상세 · 뜬이유`,
     description: `cluster ${params.id} — Coverage Distribution`,
-    robots: { index: false, follow: true }, // mock data shouldn't be indexed
+    robots: { index: false, follow: true },
   }
 }
 
@@ -103,10 +124,12 @@ export default async function ClusterPage({ params }: ClusterPageProps) {
   const total = totalCoverage(cluster.coverage)
   const insufficient = cluster.sample_quality === 'insufficient_sample'
   const showBar = isCoverageRelevant(cluster.category) && !insufficient
+  const entity = cluster.ai_analysis.deep?.entity_card
+  const trend = cluster.ai_analysis.deep?.trend
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-10 md:px-6 md:py-14">
+      <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10 md:px-6 md:py-14">
         <BackLink />
 
         <header className="flex flex-col gap-3">
@@ -117,41 +140,79 @@ export default async function ClusterPage({ params }: ClusterPageProps) {
           <div className="flex flex-wrap items-center gap-3 text-body-sm text-slate-400">
             <span>표본 N={total}</span>
             <span aria-hidden="true">·</span>
-            <time dateTime={cluster.updated_at}>
-              {relativeTime(cluster.updated_at)} 갱신
-            </time>
+            <time dateTime={cluster.updated_at}>{relativeTime(cluster.updated_at)} 갱신</time>
             <span aria-hidden="true">·</span>
             <code className="font-mono">{cluster.methodology_version}</code>
           </div>
         </header>
 
-        <AiAnalysisStack analysis={cluster.ai_analysis} />
-
-        {showBar && (
-          <CoverageDistributionPanel
-            coverage={cluster.coverage}
-            insufficient={insufficient}
-          />
-        )}
-
-        {!showBar && !insufficient && (
-          <section
-            aria-label="보도 분포"
-            className="flex flex-col gap-2 rounded-lg border border-slate-800 bg-slate-900/40 p-5 text-body-sm text-slate-400"
-          >
-            <h2 className="text-heading-md font-pretendard text-slate-50">보도 분포</h2>
-            <p>
-              <strong className="text-slate-200">{CATEGORY_LABEL[cluster.category]}</strong>{' '}
-              카테고리는 진보·중도·보수 분류가 의미 있는 영역이 아닙니다. V0.5에서 카테고리
-              특화 시각화 (외신 비중 / 매체 다양도 지수 등)가 추가됩니다.
-            </p>
-            <p className="text-slate-500">
-              아래 매체별 보도 리스트로 다원적 원본에 직접 접근하세요.
-            </p>
+        {cluster.youtube_news && (
+          <section aria-label="영상 뉴스">
+            <YouTubeEmbed
+              videoId={cluster.youtube_news.video_id}
+              title={cluster.youtube_news.title}
+              channel={cluster.youtube_news.channel}
+            />
           </section>
         )}
 
-        {insufficient && <InsufficientNotice total={total} />}
+        <article className="flex flex-col gap-2 rounded-lg border border-teal-500/30 bg-teal-500/5 p-5">
+          <header className="flex items-baseline gap-2">
+            <span aria-hidden="true">🚀</span>
+            <h2 className="text-heading-md font-pretendard text-teal-100">왜 지금 떴는가</h2>
+          </header>
+          <p className="text-body-md leading-relaxed text-slate-100">
+            {cluster.ai_analysis.why_trending}
+          </p>
+        </article>
+
+        <article className="flex flex-col gap-3 rounded-lg border border-slate-800 bg-slate-900/60 p-5">
+          <header className="flex items-baseline gap-2">
+            <span aria-hidden="true">📰</span>
+            <h2 className="text-heading-md font-pretendard text-slate-50">
+              매체는 어떻게 다뤘나
+            </h2>
+          </header>
+          <p className="text-body-md leading-relaxed text-slate-200">
+            {cluster.ai_analysis.coverage_summary}
+          </p>
+
+          {showBar && (
+            <CoverageDistributionPanel
+              coverage={cluster.coverage}
+              insufficient={insufficient}
+            />
+          )}
+          {!showBar && !insufficient && (
+            <p className="rounded-md bg-slate-950/60 px-3 py-2 text-body-sm text-slate-400">
+              <strong className="text-slate-200">{CATEGORY_LABEL[cluster.category]}</strong>{' '}
+              카테고리는 진영 분포가 의미 있는 영역이 아닙니다. V0.5에서 카테고리 특화 시각화
+              (외신 비중 / 매체 다양도 지수 등)가 추가됩니다.
+            </p>
+          )}
+          {insufficient && <InsufficientNotice total={total} inline />}
+        </article>
+
+        <article className="flex flex-col gap-5 rounded-lg border border-slate-800 bg-slate-900/40 p-5">
+          <header className="flex items-baseline gap-2">
+            <span aria-hidden="true">🧠</span>
+            <h2 className="text-heading-md font-pretendard text-slate-50">AI 정밀 분석</h2>
+          </header>
+
+          {entity && <EntityPanel entity={entity} />}
+          {!entity && (
+            <p className="text-body-sm text-slate-500">
+              이 이슈는 정책·이슈 형태라 별도의 정체 정의를 두지 않습니다.
+            </p>
+          )}
+
+          {trend && <TrendPanel trend={trend} />}
+
+          <p className="text-body-sm text-slate-500">
+            P0w mock 분석입니다. P0a (T-005)에서 Claude Haiku + 출처 트래킹, T-006 워커
+            (ADR-008)에서 keyword_trends 시계열로 교체됩니다.
+          </p>
+        </article>
 
         <section aria-label="매체별 보도" className="flex flex-col gap-3">
           <h2 className="text-heading-md font-pretendard text-slate-50">
@@ -199,38 +260,19 @@ function CoverageDistributionPanel({
   insufficient: boolean
 }) {
   return (
-    <section
+    <div
+      role="group"
       aria-label="보도 분포 (Coverage Distribution)"
-      className="flex flex-col gap-4 rounded-lg border border-slate-800 bg-slate-900/40 p-5"
+      className="flex flex-col gap-3 rounded-md bg-slate-950/60 p-4"
     >
-      <header className="flex flex-col gap-1">
-        <h2 className="text-heading-md font-pretendard text-slate-50">보도 분포</h2>
-        <p className="text-body-sm text-slate-400">
-          이 이슈를 다룬 매체를 진영 4구간으로 나누어 표시합니다 — 판단이 아닌 분포입니다.
-        </p>
-      </header>
-
-      <CoverageBar coverage={coverage} insufficient={insufficient} className="h-4" />
-
+      <CoverageBar coverage={coverage} insufficient={insufficient} className="h-3" />
       <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <CoverageStat
-          label="진보 성향"
-          value={coverage.progressive}
-          colorClass="text-coverage-progressive"
-        />
-        <CoverageStat
-          label="중도·혼합"
-          value={coverage.mixed}
-          colorClass="text-coverage-mixed"
-        />
-        <CoverageStat
-          label="보수 성향"
-          value={coverage.conservative}
-          colorClass="text-coverage-conservative"
-        />
+        <CoverageStat label="진보 성향" value={coverage.progressive} colorClass="text-coverage-progressive" />
+        <CoverageStat label="중도·혼합" value={coverage.mixed} colorClass="text-coverage-mixed" />
+        <CoverageStat label="보수 성향" value={coverage.conservative} colorClass="text-coverage-conservative" />
         <CoverageStat label="외신" value={coverage.foreign} colorClass="text-coverage-foreign" />
       </dl>
-    </section>
+    </div>
   )
 }
 
@@ -244,14 +286,22 @@ function CoverageStat({
   colorClass: string
 }) {
   return (
-    <div className="flex flex-col gap-1 rounded-md bg-slate-950/60 p-3">
+    <div>
       <dt className="text-body-sm text-slate-400">{label}</dt>
       <dd className={cn('font-mono text-mono-lg', colorClass)}>{value}</dd>
     </div>
   )
 }
 
-function InsufficientNotice({ total }: { total: number }) {
+function InsufficientNotice({ total, inline = false }: { total: number; inline?: boolean }) {
+  if (inline) {
+    return (
+      <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-body-sm text-amber-200">
+        보도 표본 {total}건으로 부족 (≥ 5건 필요). 분포는 형성 중이며, 표본이 충족되면 자동
+        갱신됩니다.
+      </p>
+    )
+  }
   return (
     <section
       aria-label="표본 부족"
@@ -263,6 +313,95 @@ function InsufficientNotice({ total }: { total: number }) {
         충족되면 자동 갱신됩니다.
       </p>
     </section>
+  )
+}
+
+function EntityPanel({ entity }: { entity: EntityCard }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-md bg-slate-950/60 p-4">
+      <div className="flex items-baseline gap-2">
+        <span aria-hidden="true">🪪</span>
+        <h3 className="text-heading-md font-pretendard text-slate-50">정체</h3>
+      </div>
+      <p className="text-body-md leading-relaxed text-slate-200">{entity.definition}</p>
+      {entity.domain_facts.length > 0 && (
+        <dl className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {entity.domain_facts.map((fact) => (
+            <div key={fact.label} className="flex flex-col gap-0.5">
+              <dt className="text-body-sm text-slate-500">{fact.label}</dt>
+              <dd className="text-body-md text-slate-100">
+                {fact.value}
+                {fact.source && (
+                  <span className="ml-2 font-mono text-body-sm text-slate-500">
+                    ({fact.source})
+                  </span>
+                )}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  )
+}
+
+function TrendPanel({ trend }: { trend: TrendAnalysis }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-md bg-slate-950/60 p-4">
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="flex items-baseline gap-2">
+          <span aria-hidden="true">📈</span>
+          <h3 className="text-heading-md font-pretendard text-slate-50">AI 흐름 분석</h3>
+        </div>
+        <span className="text-body-sm text-slate-500">
+          {trend.cached ? '캐시 데이터' : '런타임 mock'}
+        </span>
+      </div>
+      <p className="text-body-sm text-slate-500">
+        검색·보도 지표를 0~100으로 정규화한 시계열입니다 (ADR-008). 윈도우별 마지막 점이 현재
+        값입니다.
+      </p>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {trend.windows.map((w) => (
+          <TrendWindowRow key={w.window} window={w} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function TrendWindowRow({ window }: { window: TrendWindow }) {
+  const last = window.buckets[window.buckets.length - 1]?.v ?? 0
+  const first = window.buckets[0]?.v ?? 0
+  const delta = last - first
+  const arrow = delta > 1 ? '↑' : delta < -1 ? '↓' : '→'
+  const arrowColor =
+    delta > 1 ? 'text-teal-500' : delta < -1 ? 'text-rose-500' : 'text-slate-500'
+  const ariaLabel = `${WINDOW_LABEL[window.window]} 트렌드, 마지막 값 ${last}점 (시작 대비 ${delta > 0 ? '+' : ''}${delta.toFixed(1)})`
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-baseline justify-between gap-2 text-body-sm text-slate-400">
+        <span>{WINDOW_LABEL[window.window]}</span>
+        <span className="flex items-baseline gap-1.5 font-mono text-slate-200">
+          {last.toFixed(1)}
+          <span className={cn('text-body-sm', arrowColor)} aria-hidden="true">
+            {arrow}
+          </span>
+          <span className="text-body-sm text-slate-500">/ 100</span>
+        </span>
+      </div>
+      <TrendSparkline
+        data={window.buckets.map((b) => b.v)}
+        width={320}
+        height={48}
+        ariaLabel={ariaLabel}
+      />
+      <div className="flex items-baseline justify-between gap-2 text-body-sm text-slate-500">
+        <span>출처: {window.source}</span>
+        <span className="font-mono">{window.buckets.length} buckets</span>
+      </div>
+    </div>
   )
 }
 
@@ -297,42 +436,6 @@ function OutletRow({ report }: { report: OutletReport }) {
         ↗
       </span>
     </a>
-  )
-}
-
-function AiAnalysisStack({ analysis }: { analysis: AiAnalysis }) {
-  return (
-    <section aria-label="AI 분석" className="flex flex-col gap-3">
-      {analysis.subject && (
-        <article className="flex flex-col gap-2 rounded-lg border border-slate-800 bg-slate-900/40 p-5">
-          <header className="flex items-baseline gap-2">
-            <span aria-hidden="true">🪪</span>
-            <h2 className="text-heading-md font-pretendard text-slate-50">정체</h2>
-          </header>
-          <p className="text-body-md leading-relaxed text-slate-200">{analysis.subject}</p>
-        </article>
-      )}
-
-      <article className="flex flex-col gap-2 rounded-lg border border-teal-500/30 bg-teal-500/5 p-5">
-        <header className="flex items-baseline gap-2">
-          <span aria-hidden="true">🚀</span>
-          <h2 className="text-heading-md font-pretendard text-teal-100">왜 지금 떴는가</h2>
-        </header>
-        <p className="text-body-md leading-relaxed text-slate-100">{analysis.why_trending}</p>
-      </article>
-
-      <article className="flex flex-col gap-2 rounded-lg border border-slate-800 bg-slate-900/60 p-5">
-        <header className="flex items-baseline gap-2">
-          <span aria-hidden="true">📰</span>
-          <h2 className="text-heading-md font-pretendard text-slate-50">매체는 어떻게 다뤘나</h2>
-        </header>
-        <p className="text-body-md leading-relaxed text-slate-200">{analysis.coverage_summary}</p>
-        <p className="text-body-sm text-slate-500">
-          P0w mock 분석입니다. P0a (T-005)에서 Claude Haiku 출력 + copy ratio ≤ 15% 검증으로
-          교체됩니다.
-        </p>
-      </article>
-    </section>
   )
 }
 

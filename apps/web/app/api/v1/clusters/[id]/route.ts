@@ -1,17 +1,19 @@
 /**
  * GET /api/v1/clusters/[id]
  *
- * Cluster Distribution detail — v1.6.3 patch.
+ * Cluster Distribution detail — v1.6.5 patch.
  *
  * P0w returns mock content joined from:
  *   - lib/mock/clusters.ts        → SeedCluster (title, category, sample_quality)
  *   - lib/mock/clusters.ts        → clusterCoverageAt (minute-jittered counts)
- *   - lib/mock/cluster-details.ts → ai_summary + outlet_reports
+ *   - lib/mock/cluster-details.ts → ai_analysis (why/coverage/entity_card?), outlet_reports, youtube_news?
  *   - lib/mock/outlets.ts         → outlet metadata (name, stance, base_url)
+ *   - lib/mock/trend.ts           → 4-window time series (deterministic, ADR-008 mock)
  *
- * P0a (T-006/T-007) swaps mock joins for real Supabase reads:
+ * P0a (T-005/T-006/T-007) swaps mock joins for real Supabase reads:
  *   - articles + sources joined to cluster_id
  *   - summaries row by cluster_id (Claude Haiku output, prompt_version logged)
+ *   - keyword_trends rows from background worker (ADR-008)
  *
  * Constraints (CLAUDE.md):
  * - rule 4: NEVER include bias_score / factuality_score / embedding /
@@ -26,6 +28,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import {
   ClusterDetailResponseSchema,
+  type AiAnalysis,
   type OutletReport,
 } from '@/lib/api/cluster-schemas'
 import {
@@ -35,6 +38,7 @@ import {
 } from '@/lib/mock/clusters'
 import { getClusterDetail } from '@/lib/mock/cluster-details'
 import { findOutlet } from '@/lib/mock/outlets'
+import { generateTrend } from '@/lib/mock/trend'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -95,13 +99,27 @@ export async function GET(
     return NextResponse.json({ error: 'no_outlets' }, { status: 503 })
   }
 
+  // v1.6.5: trend is generated at request time in P0w; P0a will SELECT
+  // from `keyword_trends` (ADR-008) and set `cached: true`.
+  const trend = generateTrend(seed.cluster_id, now)
+
+  const ai_analysis: AiAnalysis = {
+    why_trending: detail.ai_analysis.why_trending,
+    coverage_summary: detail.ai_analysis.coverage_summary,
+    deep: {
+      entity_card: detail.ai_analysis.entity_card,
+      trend,
+    },
+  }
+
   const payload = ClusterDetailResponseSchema.parse({
     cluster_id: seed.cluster_id,
     title: seed.title,
     category: seed.category,
     coverage: clusterCoverageAt(seed, now),
     sample_quality: seed.sample_quality,
-    ai_analysis: detail.ai_analysis,
+    ai_analysis,
+    youtube_news: detail.youtube_news,
     outlets,
     methodology_version: METHODOLOGY_VERSION,
     updated_at,
