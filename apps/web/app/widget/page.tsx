@@ -26,11 +26,12 @@ import { RisingIssuesList } from '@/components/RisingIssuesList'
 import { PreorderCallouts } from '@/components/PreorderCallouts'
 
 export const metadata: Metadata = {
-  title: '실시간 이슈 · 뜬이유',
-  description: '한국 언론의 실시간 이슈와 보도 분포를 5초에 파악하세요.',
+  title: '한국 이슈 리스크 OS · 뜬이유',
+  description:
+    '오늘 뜬 이슈 + AI 정밀 분석 + 매체별 보도 흐름 — 크리에이터·홍보·연구자를 위한 소재·리스크 인프라.',
   openGraph: {
-    title: '실시간 이슈 · 뜬이유',
-    description: '한국 언론의 실시간 이슈와 보도 분포를 5초에 파악하세요.',
+    title: '뜬이유 — 한국 이슈 리스크 OS',
+    description: '5초에 파악, 5분에 분석, 5초 안에 콘텐츠로.',
     type: 'website',
     locale: 'ko_KR',
   },
@@ -61,11 +62,11 @@ export default async function WidgetPage() {
       <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-10 md:max-w-5xl md:px-6 md:py-14">
         <header className="flex flex-col gap-3">
           <p className="text-body-sm uppercase tracking-wide text-slate-400">
-            실시간 이슈 · 뜬이유
+            뜬이유 · Issue Risk OS
           </p>
-          <h1 className="text-display-md font-pretendard">지금 한국 언론에서 뜨는 이유</h1>
+          <h1 className="text-display-md font-pretendard">한국 이슈 리스크 OS</h1>
           <p className="text-body-md text-slate-400">
-            보도 분포는 최대 60분 지연될 수 있습니다 · 60초마다 자동 갱신
+            5초에 파악, 5분에 분석, 5초 안에 콘텐츠로 — 60초마다 자동 갱신
           </p>
         </header>
 

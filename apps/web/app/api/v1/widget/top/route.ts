@@ -18,6 +18,7 @@ import {
   WidgetSmallResponseSchema,
   WidgetMediumResponseSchema,
   WidgetLargeResponseSchema,
+  type WidgetCluster,
 } from '@/lib/api/widget-schemas'
 import {
   rotateClusters,
@@ -25,6 +26,20 @@ import {
   rotationDiversityIndex,
   METHODOLOGY_VERSION,
 } from '@/lib/mock/clusters'
+import { lookupAffiliateForTitle } from '@/lib/affiliate/curation'
+
+/**
+ * v1.6.5+ T-W04: enrich each cluster with `affiliate_slot` from manual
+ * curation (ADR-007). Politics/military/medical clusters carry
+ * `ad_allowed=false` (PRD §9.7) so they NEVER receive an affiliate slot
+ * even if keyword matches — defense in depth at the API boundary.
+ */
+function enrichWithAffiliate(cluster: WidgetCluster, now: Date): WidgetCluster {
+  if (!cluster.ad_allowed) return cluster
+  const slot = lookupAffiliateForTitle(cluster.title, now)
+  if (!slot) return cluster
+  return { ...cluster, affiliate_slot: slot }
+}
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -52,18 +67,23 @@ export async function GET(request: NextRequest) {
     if (!first) {
       return NextResponse.json({ error: 'no_clusters' }, { status: 503 })
     }
-    const payload = WidgetSmallResponseSchema.parse({ ...first, updated_at })
+    const enriched = enrichWithAffiliate({ ...first, updated_at }, now)
+    const payload = WidgetSmallResponseSchema.parse(enriched)
     return NextResponse.json(payload, { headers: COMMON_HEADERS })
   }
 
   if (sizeResult.data === 'medium') {
-    const clusters = rotateClusters(now, 3)
+    const clusters = rotateClusters(now, 3).map((c) =>
+      enrichWithAffiliate({ ...c, updated_at }, now),
+    )
     const payload = WidgetMediumResponseSchema.parse({ clusters, updated_at })
     return NextResponse.json(payload, { headers: COMMON_HEADERS })
   }
 
   // large — Top 10 (v1.6.1)
-  const clusters = rotateClusters(now, 10)
+  const clusters = rotateClusters(now, 10).map((c) =>
+    enrichWithAffiliate({ ...c, updated_at }, now),
+  )
   const payload = WidgetLargeResponseSchema.parse({
     clusters,
     methodology_version: METHODOLOGY_VERSION,

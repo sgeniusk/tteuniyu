@@ -1,0 +1,52 @@
+# 뜬이유 — 제휴 링크 수동 큐레이션 (T-W04 / ADR-007)
+#
+# 운영 원칙 (PRD v1.6 §6.4 + ADR-007):
+#   - 운영자(태욱)가 하루 1회 수동 등록만 (P0w·P0a). 자동 매칭은 V0.5 이후.
+#   - 동시 활성 entries 최대 5개.
+#   - 모든 affiliate_url에 lptag (쿠팡파트너스) / afId (11번가) / tag= (Amazon) 트래킹 파라미터 필수.
+#   - 정치·국방·의료·사고·재해 카테고리 cluster에는 절대 매칭 금지 (PRD v1.6 §9.7).
+#   - issue_keyword는 cluster.title의 자연 매칭만 — 무관한 광고 매칭 금지.
+#
+# Schema 검증: harness:affiliate-link-provenance (Sprint 0 본격 구현)
+# Mock 운영 단계: P0w 시각 검증 + 카피·UX 안전 검증.
+
+entries:
+  - id: '2026-05-04-001'
+    issue_keyword: '미세먼지'
+    partner: coupang
+    product_title: '공기청정기 헤파 13등급'
+    affiliate_url: 'https://link.coupang.com/a/MOCK01?lptag=AFmock01'
+    label: Related
+    valid_until: '2026-08-31T23:59:59Z'
+    created_by: 'taewook'
+    notes: '봄철 미세먼지 30% 이슈 자연 매칭'
+
+  - id: '2026-05-04-002'
+    issue_keyword: 'KBO'
+    partner: coupang
+    product_title: 'KBO 응원 굿즈 티셔츠'
+    affiliate_url: 'https://link.coupang.com/a/MOCK02?lptag=AFmock02'
+    label: Related
+    valid_until: '2026-10-31T23:59:59Z'
+    created_by: 'taewook'
+    notes: 'KBO 흥행 이슈와 굿즈 연결'
+
+  - id: '2026-05-04-003'
+    issue_keyword: '현대차'
+    partner: coupang
+    product_title: '전기차 휴대용 충전기'
+    affiliate_url: 'https://link.coupang.com/a/MOCK03?lptag=AFmock03'
+    label: Related
+    valid_until: '2026-08-31T23:59:59Z'
+    created_by: 'taewook'
+    notes: '현대 EV 사전예약 흥행 이슈와 자연 매칭'
+
+  - id: '2026-05-04-004'
+    issue_keyword: 'OpenAI'
+    partner: coupang
+    product_title: '생성 AI 활용 입문서'
+    affiliate_url: 'https://link.coupang.com/a/MOCK04?lptag=AFmock04'
+    label: Related
+    valid_until: '2026-08-31T23:59:59Z'
+    created_by: 'taewook'
+    notes: 'OpenAI 한국어 모델 발표 이슈 — 학습 콘텐츠 매칭'

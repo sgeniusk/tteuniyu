@@ -1,27 +1,30 @@
 /**
- * /cluster/[id] — Coverage Distribution detail (v1.6.5 patch).
+ * /cluster/[id] — Coverage Distribution detail (T-W04 / ADR-009 + ADR-010 applied).
  *
  * P0w: mock-rich page joining the widget seed + cluster details + outlets +
  * deterministic trend windows. Real T-005/T-006/T-007 (P0a) swap mock joins
  * for Supabase reads (articles + summaries + keyword_trends per ADR-008).
  *
- * Layer 3 in PRD v1.6 §1.3 — the Coverage Distribution surface.
+ * Layer 3 in PRD v1.6 §1.3 — Coverage Distribution surface.
  *
- * v1.6.5 card order:
+ * Card order (v1.6.5 + ADR-009):
  *   ← back / header
  *   📺 영상 뉴스 (optional, YouTube Lite Embed)
  *   🚀 왜 지금 떴는가 (teal accent)
- *   📰 매체는 어떻게 다뤘나 (+ Coverage Bar panel for politics/society)
- *   🧠 AI 정밀 분석 (entity_card + 4-window trend sparklines)
- *   매체별 보도 list
+ *   📰 매체는 어떻게 다뤘나 (prose only — Coverage Bar moved per ADR-009)
+ *   🧠 AI 정밀 분석 (entity_card + trend + auxiliary stance mini panel)
+ *   매체별 보도 list (neutral grey dot, ADR-009)
  *   P12 footer
  *
+ * ADR-009 (이념 라벨링 보조화):
+ * - Coverage Bar removed from 📰 매체 card; mini panel inside 🧠 AI 정밀 분석
+ *   only for politics/society. Other categories: no panel.
+ * - 매체 row stance color dot → neutral slate (no political tagging).
+ * - "보도 분포" → "📊 매체 진영 분포 (보조 통계)".
+ *
  * Constraints (CLAUDE.md / PRD v1.6):
- * - rule 12 (P12) Revenue Zone Isolation: NO `<AdZone>`, `<AffiliateCard>`,
- *   `<SponsoredCard>` here. harness:ad-zone-boundary verifies.
- * - rule 5 wording: "보도 분포" / "Coverage Distribution" only.
- * - v1.6.2 §C-3: Coverage Bar visualizes only politics/society categories;
- *   other categories show a placeholder note pending V0.5 visualization.
+ * - rule 12 (P12): NO AdZone / AffiliateCard / SponsoredCard rendered here.
+ * - rule 5: "보도 분포" / "Coverage Distribution" wording (now only inside aux panel).
  */
 
 import type { Metadata } from 'next'
@@ -59,25 +62,13 @@ const CATEGORY_LABEL: Record<Category, string> = {
 }
 
 const STANCE_LABEL = {
-  progressive: '진보 성향',
-  mixed: '중도·혼합',
-  conservative: '보수 성향',
+  progressive: '매체군 A',
+  mixed: '매체군 B',
+  conservative: '매체군 C',
   foreign: '외신',
 } as const
 
-const STANCE_DOT_CLASS = {
-  progressive: 'bg-coverage-progressive',
-  mixed: 'bg-coverage-mixed',
-  conservative: 'bg-coverage-conservative',
-  foreign: 'bg-coverage-foreign',
-} as const
-
-const STANCE_TEXT_CLASS = {
-  progressive: 'text-coverage-progressive',
-  mixed: 'text-coverage-mixed',
-  conservative: 'text-coverage-conservative',
-  foreign: 'text-coverage-foreign',
-} as const
+const STANCE_NEUTRAL_DOT = 'bg-slate-600'
 
 const WINDOW_LABEL: Record<TrendWindow['window'], string> = {
   '7d': '지난 7일',
@@ -89,7 +80,7 @@ const WINDOW_LABEL: Record<TrendWindow['window'], string> = {
 export async function generateMetadata({ params }: ClusterPageProps): Promise<Metadata> {
   return {
     title: `이슈 상세 · 뜬이유`,
-    description: `cluster ${params.id} — Coverage Distribution`,
+    description: `cluster ${params.id} — Issue Risk OS detail`,
     robots: { index: false, follow: true },
   }
 }
@@ -123,7 +114,7 @@ export default async function ClusterPage({ params }: ClusterPageProps) {
   const cluster = result.data
   const total = totalCoverage(cluster.coverage)
   const insufficient = cluster.sample_quality === 'insufficient_sample'
-  const showBar = isCoverageRelevant(cluster.category) && !insufficient
+  const showAuxStance = isCoverageRelevant(cluster.category) && !insufficient
   const entity = cluster.ai_analysis.deep?.entity_card
   const trend = cluster.ai_analysis.deep?.trend
 
@@ -134,7 +125,7 @@ export default async function ClusterPage({ params }: ClusterPageProps) {
 
         <header className="flex flex-col gap-3">
           <p className="text-body-sm uppercase tracking-wide text-slate-400">
-            {CATEGORY_LABEL[cluster.category]} · 뜬이유
+            {CATEGORY_LABEL[cluster.category]} · 뜬이유 · Issue Risk OS
           </p>
           <h1 className="text-display-md font-pretendard">{cluster.title}</h1>
           <div className="flex flex-wrap items-center gap-3 text-body-sm text-slate-400">
@@ -176,20 +167,6 @@ export default async function ClusterPage({ params }: ClusterPageProps) {
           <p className="text-body-md leading-relaxed text-slate-200">
             {cluster.ai_analysis.coverage_summary}
           </p>
-
-          {showBar && (
-            <CoverageDistributionPanel
-              coverage={cluster.coverage}
-              insufficient={insufficient}
-            />
-          )}
-          {!showBar && !insufficient && (
-            <p className="rounded-md bg-slate-950/60 px-3 py-2 text-body-sm text-slate-400">
-              <strong className="text-slate-200">{CATEGORY_LABEL[cluster.category]}</strong>{' '}
-              카테고리는 진영 분포가 의미 있는 영역이 아닙니다. V0.5에서 카테고리 특화 시각화
-              (외신 비중 / 매체 다양도 지수 등)가 추가됩니다.
-            </p>
-          )}
           {insufficient && <InsufficientNotice total={total} inline />}
         </article>
 
@@ -207,6 +184,10 @@ export default async function ClusterPage({ params }: ClusterPageProps) {
           )}
 
           {trend && <TrendPanel trend={trend} />}
+
+          {showAuxStance && (
+            <AuxiliaryStancePanel coverage={cluster.coverage} />
+          )}
 
           <p className="text-body-sm text-slate-500">
             P0w mock 분석입니다. P0a (T-005)에서 Claude Haiku + 출처 트래킹, T-006 워커
@@ -235,6 +216,10 @@ export default async function ClusterPage({ params }: ClusterPageProps) {
             이 영역에는 광고·제휴·스폰서 카드가 절대 렌더되지 않습니다 (P12 수익 영역 분리,
             ADR-005). 이의제기·외신 비교·OG 공유 카드는 P0a (T-007)에서 추가됩니다.
           </p>
+          <p className="mt-2">
+            뜬이유는 가치 판단 도구가 아닙니다. 매체별 보도와 시간 흐름을 한 화면에 정리해
+            소재·리스크·연구에 활용 가능한 형태로 제공합니다 (ADR-010).
+          </p>
         </footer>
       </div>
     </main>
@@ -252,43 +237,49 @@ function BackLink() {
   )
 }
 
-function CoverageDistributionPanel({
+/**
+ * ADR-009: ideological labeling moved to AI deep panel as auxiliary info.
+ * Only rendered for politics/society categories with sufficient sample.
+ * Compact layout (slate-950 background, smaller fonts) signals "참고 정보".
+ */
+function AuxiliaryStancePanel({
   coverage,
-  insufficient,
 }: {
   coverage: ClusterDetailResponse['coverage']
-  insufficient: boolean
 }) {
   return (
     <div
       role="group"
-      aria-label="보도 분포 (Coverage Distribution)"
+      aria-label="매체 진영 분포 (보조 통계)"
       className="flex flex-col gap-3 rounded-md bg-slate-950/60 p-4"
     >
-      <CoverageBar coverage={coverage} insufficient={insufficient} className="h-3" />
+      <div className="flex items-baseline gap-2">
+        <span aria-hidden="true">📊</span>
+        <h3 className="text-heading-md font-pretendard text-slate-50">
+          매체 진영 분포
+        </h3>
+        <span className="text-body-sm text-slate-500">(보조 통계)</span>
+      </div>
+      <p className="text-body-sm text-slate-400">
+        AllSides·Ad Fontes 공개 매핑 기반의 매체군 분포 추정입니다. 개별 기사·매체에 대한 가치
+        판단이 아닌 출처·보도 패턴 기반의 보조 정보입니다.
+      </p>
+      <CoverageBar coverage={coverage} className="h-3" />
       <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <CoverageStat label="진보 성향" value={coverage.progressive} colorClass="text-coverage-progressive" />
-        <CoverageStat label="중도·혼합" value={coverage.mixed} colorClass="text-coverage-mixed" />
-        <CoverageStat label="보수 성향" value={coverage.conservative} colorClass="text-coverage-conservative" />
-        <CoverageStat label="외신" value={coverage.foreign} colorClass="text-coverage-foreign" />
+        <StanceStat label={STANCE_LABEL.progressive} value={coverage.progressive} />
+        <StanceStat label={STANCE_LABEL.mixed} value={coverage.mixed} />
+        <StanceStat label={STANCE_LABEL.conservative} value={coverage.conservative} />
+        <StanceStat label={STANCE_LABEL.foreign} value={coverage.foreign} />
       </dl>
     </div>
   )
 }
 
-function CoverageStat({
-  label,
-  value,
-  colorClass,
-}: {
-  label: string
-  value: number
-  colorClass: string
-}) {
+function StanceStat({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <dt className="text-body-sm text-slate-400">{label}</dt>
-      <dd className={cn('font-mono text-mono-lg', colorClass)}>{value}</dd>
+      <dt className="text-body-sm text-slate-500">{label}</dt>
+      <dd className="font-mono text-mono-md text-slate-200">{value}</dd>
     </div>
   )
 }
@@ -405,6 +396,11 @@ function TrendWindowRow({ window }: { window: TrendWindow }) {
   )
 }
 
+/**
+ * ADR-009: outlet rows lose political color tagging. Stance dot is neutral
+ * slate; stance label uses 매체군 A/B/C/외신 instead of progressive/mixed/etc.
+ * Visual hierarchy now centers on outlet name + headline + time.
+ */
 function OutletRow({ report }: { report: OutletReport }) {
   return (
     <a
@@ -415,13 +411,11 @@ function OutletRow({ report }: { report: OutletReport }) {
     >
       <span
         aria-hidden="true"
-        className={cn('mt-1.5 h-2 w-2 shrink-0 rounded-full', STANCE_DOT_CLASS[report.stance])}
+        className={cn('mt-1.5 h-2 w-2 shrink-0 rounded-full', STANCE_NEUTRAL_DOT)}
       />
       <div className="flex-1">
         <div className="flex flex-wrap items-baseline gap-2">
-          <span className={cn('text-body-sm font-medium', STANCE_TEXT_CLASS[report.stance])}>
-            {report.outlet_name}
-          </span>
+          <span className="text-body-sm font-medium text-slate-200">{report.outlet_name}</span>
           <span className="text-body-sm text-slate-500">{STANCE_LABEL[report.stance]}</span>
           <span aria-hidden="true" className="text-slate-600">
             ·
