@@ -107,7 +107,7 @@ export default async function EmbedIframePage({ searchParams }: EmbedPageProps) 
               rel="noopener noreferrer"
               className="text-teal-500 hover:underline"
             >
-              뜬이유
+              뜬이유 · Issue Risk OS
             </a>
           </span>
           <span className="font-mono">{data.methodology_version}</span>

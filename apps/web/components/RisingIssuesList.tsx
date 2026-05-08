@@ -10,12 +10,14 @@
 
 'use client'
 
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   WidgetLargeResponseSchema,
   type WidgetLargeResponse,
 } from '@/lib/api/widget-schemas'
 import { IssueCard } from '@/components/IssueCard'
+import { AdZone } from '@/components/AdZone'
+import { AffiliateCard } from '@/components/AffiliateCard'
 import { relativeTime } from '@/lib/format'
 
 interface RisingIssuesListProps {
@@ -75,6 +77,15 @@ export function RisingIssuesList({
     return () => clearInterval(t)
   }, [])
 
+  // T-W04: pick the first cluster (by rank) whose affiliate_slot is enabled
+  // for the inline AdZone shown between rank 5 and 6.
+  // ADR-007 + PRD §9.7: API has already enforced ad_allowed=false for
+  // politics/military/medical, so this find naturally skips them.
+  const adClusterForSlot = useMemo(
+    () => data.clusters.find((c) => c.affiliate_slot?.enabled),
+    [data.clusters],
+  )
+
   return (
     <>
       <div className="flex items-center justify-between text-body-sm text-slate-400">
@@ -111,17 +122,22 @@ export function RisingIssuesList({
               <IssueCard cluster={cluster} rank={idx + 1} />
             </li>
             {/*
-              v1.6.2 patch — AdZone slot marker between rank 5 and 6.
-              T-W04 will replace this hidden <li/> with <AdZone slot="..."/>.
-              Kept hidden now so the layout stays stable when AdZone lands.
+              T-W04: AdZone between rank 5 and 6 (replaces v1.6.2 hidden marker).
+              Renders only when a curated affiliate slot is available;
+              spans both grid columns on md+ for visual separation.
             */}
-            {idx === 4 && (
-              <li
-                role="presentation"
-                aria-hidden="true"
-                data-ad-slot="rising-issues-mid"
-                className="hidden"
-              />
+            {idx === 4 && adClusterForSlot?.affiliate_slot && (
+              <li className="md:col-span-2">
+                <AdZone
+                  slot="affiliate"
+                  cluster_id={adClusterForSlot.cluster_id}
+                >
+                  <AffiliateCard
+                    slot={adClusterForSlot.affiliate_slot}
+                    cluster_id={adClusterForSlot.cluster_id}
+                  />
+                </AdZone>
+              </li>
             )}
           </Fragment>
         ))}

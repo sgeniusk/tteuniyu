@@ -2,11 +2,12 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: '뜬이유 — 실시간 이슈',
-  description: '한국 언론의 실시간 이슈와 보도 분포를 5초에 파악하세요.',
+  title: '뜬이유 — 한국 이슈 리스크 OS',
+  description:
+    '오늘 뜬 이슈, AI 정밀 분석, 매체별 보도 흐름을 한 화면에 — 크리에이터·홍보·연구자를 위한 소재·리스크 인프라.',
   openGraph: {
-    title: '뜬이유 — 실시간 이슈',
-    description: '한국 언론의 실시간 이슈와 보도 분포를 5초에 파악하세요.',
+    title: '뜬이유 — 한국 이슈 리스크 OS',
+    description: '5초에 파악, 5분에 분석, 5초 안에 콘텐츠로.',
     type: 'website',
     locale: 'ko_KR',
   },
