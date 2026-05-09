@@ -1,13 +1,13 @@
-# TTEUN-IYU Engineering Rules v1.6
+# TTEUN-IYU Engineering Rules v1.7.1
 
-> **Source of Truth**: `docs/prd-v1.6.md` (확정)
+> **Source of Truth**: `docs/prd-v1.7.md` + `docs/prd-v1.7.1-patch.md` (확정)
 > **This file**: Non-negotiable constraints for Claude Code and all contributors
-> **Last updated**: 2026-04-21
-> **Harness count**: 18 (enforced via `pnpm harness:all`)
+> **Last updated**: 2026-05-09
+> **Harness count**: 20 (enforced via `pnpm harness:all`, +2 in v1.7.1)
 
 ---
 
-## Non-negotiable Constraints (14조)
+## Non-negotiable Constraints (15조)
 
 ### Data & Privacy (v1.3)
 
@@ -40,29 +40,46 @@
 
 14. **Native Widget Entry Condition**: Swift / Kotlin / Xcode files (`*.swift`, `*.xcodeproj`, `Info.plist`) may not be committed unless `harness:native-widget-entry-condition` verifies that P0w Exit metrics are met via PostHog API (Paid Intent Rate ≥ 4% AND Waitlist ≥ 100). See `docs/adr/ADR-006-native-widget-staged-entry.md`.
 
+### Trust Signal & Investment Risk (v1.7.1)
+
+15. **Trust Signal & Investment Risk Layer**: `<TrustTag>` 태그는 `hoax`/`clickbait`/`low_confidence`/`investment` 4종만 허용 (임의 추가 금지). `<InvestmentImpactCard>`는 Pro+ 게이트 필수 (서버 응답에서 tier 검증 401/402/200). 가격·시세·차트·매수/매도 추천 일체 금지 (V0.5+ ADR-016 별도 발의 후). 매체 dot 색상은 `slate-400` 단일이며 4색·이념 분류 일체 금지. 자본시장법 고지 ("투자 자문 X / 본인 책임")는 모든 `<InvestmentWarning>` / `<InvestmentImpactCard>` 표시 위치에서 필수. `<TrustTag>`는 `<AdZone>` 안에 절대 렌더 금지. Enforced by `harness:no-stance-color` + `harness:trust-tag-presence`. See `docs/adr/ADR-015-trust-signal-and-investment-risk-layer.md` + `docs/adr/ADR-009-ideological-labeling-as-auxiliary.md` (Amendment 1).
+
 ---
 
 ## Naming Ban List
 
 The following expressions are **forbidden** in code, UI, comments, test fixtures, commit messages, PR descriptions, and documentation. `harness:realtime-naming` enforces this.
 
-### Korean (한글)
+### Korean (한글) — 실검·이념 분류 (v1.7.1 추가)
 - 실시간 검색어
 - 실검
 - 인기 검색어
 - 실시간 순위
 - 실시간 인기어
+- 보수 매체 / 진보 매체 / 중도 매체 / 공영 매체 (분류 표현, v1.7.1)
+- 이념 분류 / 이념 분포 / 성향 분류 / 진영 라벨 (v1.7.1)
+- 좌파 매체 / 우파 매체 (v1.7.1)
 
-### English
+### English — search + stance (v1.7.1 added)
 - Trending Keywords
 - Real-time Search
 - Hot Search
 - Real-time Ranking
+- stance / ideology / ideological (v1.7.1)
+- bias-color / stance-color (v1.7.1)
+- left-leaning / right-leaning / left-wing / right-wing (v1.7.1)
+
+### CSS classes/tokens — stance dots (v1.7.1)
+- `stance-conservative` / `stance-progressive` / `stance-neutral` / `stance-public`
+- `bias-color-*` / `ideology-*`
+- `--color-stance-*` (디자인 토큰)
 
 ### Approved Alternatives
 - **실시간 이슈** / **Rising Issues** (formal)
 - **급상승 이슈** (velocity emphasis)
 - **지금 뜨는 이유** (branded signature phrase)
+- **보도 분포** / **Coverage Distribution** (v1.6 유지)
+- **매체별 보도** / **외신 비교** (출처 표시 기반, v1.7.1 OK)
 
 ---
 
@@ -124,19 +141,21 @@ The following expressions are **forbidden** in code, UI, comments, test fixtures
 
 ---
 
-## Harness Catalog (18)
+## Harness Catalog (20)
 
 See `harness/checks/README.md` for full catalog and execution instructions.
 
 Quick reference:
 ```bash
-pnpm harness:all                              # run all 18
+pnpm harness:all                              # run all 20
 pnpm harness:ad-zone-boundary                 # v1.6 critical
 pnpm harness:affiliate-link-provenance        # v1.6 critical
 pnpm harness:native-widget-entry-condition    # v1.6 critical
-pnpm harness:realtime-naming                  # naming ban list
+pnpm harness:realtime-naming                  # naming ban list (v1.7.1 extended)
 pnpm harness:widget-contract                  # Widget API p95 + Zod
 pnpm harness:analytics-events                 # 11 required events
+pnpm harness:no-stance-color                  # v1.7.1 critical (ADR-015)
+pnpm harness:trust-tag-presence               # v1.7.1 critical (ADR-015)
 ```
 
 ---
@@ -154,6 +173,12 @@ Read these before implementing anything in the respective domains.
 | **ADR-005** | **Ad Zone Separation** | Any `<AdZone>`, `<AffiliateCard>`, `<SponsoredCard>` work |
 | **ADR-006** | **Native Widget Staged Entry** | Any Swift/Kotlin/Xcode work |
 | **ADR-007** | **Affiliate Commerce Data Boundary** | Any coupang/11st/amazon integration |
+| ADR-009 (Amendment 1) | Ideological Labeling Deprecation | Removing `<AuxiliaryStancePanel>`, dot color cleanup |
+| ADR-010 | Issue Risk OS Positioning | Persona / copy / IA decisions |
+| ADR-011 | Hybrid Coin + Subscription | Pricing, payment, tier gates |
+| ADR-013 | Headline Body Extraction | "본론 보기" toggle |
+| ADR-014 | Cost-Optimized AI Summary Pipeline | LLM worker, cache, monthly cap |
+| **ADR-015** | **Trust Signal & Investment Risk Layer** | Any `<TrustTag>`, `<InvestmentImpactCard>`, stance color removal |
 
 ---
 
@@ -178,10 +203,10 @@ Read these before implementing anything in the respective domains.
 ## Files Claude Code Should Read First on Fresh Session
 
 1. `CLAUDE.md` (this file)
-2. `docs/prd-v1.6.md`
-3. Relevant ADR(s) per ticket
+2. `docs/prd-v1.7.md` + `docs/prd-v1.7.1-patch.md`
+3. Relevant ADR(s) per ticket (especially ADR-009 Amendment 1 + ADR-015 for trust/investment work)
 4. The specific ticket in `docs/tickets/`
-5. `docs/harness-roadmap-v1.6.md` for sprint context
+5. `docs/harness-roadmap-v1.6.md` for sprint context (v1.7.1 roadmap update pending)
 
 ---
 
@@ -192,4 +217,4 @@ Codex Verifier: GitHub App installed on repo
 CI: GitHub Actions `.github/workflows/p0w-harness.yml`
 Dashboard: PostHog Cloud (us.posthog.com, project `tteuniyu-prod`)
 
-**End of CLAUDE.md v1.6**
+**End of CLAUDE.md v1.7.1**
