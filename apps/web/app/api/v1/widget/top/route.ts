@@ -80,8 +80,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(payload, { headers: COMMON_HEADERS })
   }
 
-  // large — Top 10 (v1.6.1)
-  const clusters = rotateClusters(now, 10).map((c) =>
+  // large — Top 20 (v1.7.2 Concept C 디자인, Claude Design 2026-05-10)
+  const clusters = rotateClusters(now, 20).map((c) =>
     enrichWithAffiliate({ ...c, updated_at }, now),
   )
   const payload = WidgetLargeResponseSchema.parse({

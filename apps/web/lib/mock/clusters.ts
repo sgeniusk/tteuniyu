@@ -15,7 +15,12 @@
  * order rotates by 1, counts shift slightly, trend arrows re-evaluate.
  */
 
-import type { WidgetCluster, CoverageCounts, Category } from '@/lib/api/widget-schemas'
+import type {
+  WidgetCluster,
+  CoverageCounts,
+  Category,
+  TrustTag,
+} from '@/lib/api/widget-schemas'
 
 export interface SeedCluster {
   cluster_id: string
@@ -26,6 +31,15 @@ export interface SeedCluster {
   ad_allowed: boolean
   /** v1.6.2 patch — required for routing rendering decisions. */
   category: Category
+  /**
+   * v1.7.2 — 클러스터 단위 Trust Tag (변호사 권고 ADR-015 Amendment 2).
+   * P0w mock — 임의 부여로 시각 변별. P0a — LLM 워커 trust_signal_v1 산출.
+   * UI 라벨 매핑은 components/TrustTag.tsx TRUST_TAG_CONFIG 참조.
+   *  hoax / clickbait → "검증 필요" / "제목-본문 괴리 가능성" (red-600)
+   *  low_confidence → "표본 부족" (amber-500)
+   *  investment → "기업 관련 이슈" (amber-500)
+   */
+  trust_tags?: TrustTag[]
 }
 
 const POOL: readonly SeedCluster[] = [
@@ -36,6 +50,7 @@ const POOL: readonly SeedCluster[] = [
     sample_quality: 'sufficient',
     ad_allowed: true,
     category: 'economy',
+    trust_tags: ['investment'],
   },
   {
     cluster_id: '00000000-0000-4000-8000-000000000002',
@@ -60,6 +75,7 @@ const POOL: readonly SeedCluster[] = [
     sample_quality: 'low_confidence',
     ad_allowed: true,
     category: 'tech_science',
+    trust_tags: ['low_confidence'],
   },
   {
     cluster_id: '00000000-0000-4000-8000-000000000005',
@@ -76,6 +92,7 @@ const POOL: readonly SeedCluster[] = [
     sample_quality: 'sufficient',
     ad_allowed: true,
     category: 'economy',
+    trust_tags: ['investment'],
   },
   {
     cluster_id: '00000000-0000-4000-8000-000000000007',
@@ -124,6 +141,7 @@ const POOL: readonly SeedCluster[] = [
     sample_quality: 'low_confidence',
     ad_allowed: true,
     category: 'economy',
+    trust_tags: ['clickbait'],
   },
   {
     cluster_id: '00000000-0000-4000-8000-000000000013',
@@ -148,6 +166,50 @@ const POOL: readonly SeedCluster[] = [
     sample_quality: 'insufficient_sample',
     ad_allowed: true,
     category: 'economy',
+    trust_tags: ['hoax'],
+  },
+  // v1.7.2 — Concept C 디자인 Top 20을 위해 추가 (Claude Design 2026-05-10).
+  {
+    cluster_id: '00000000-0000-4000-8000-000000000016',
+    title: '코스피 3,127 — 14개월 만에 3,100 재돌파',
+    base_coverage: { progressive: 5, mixed: 9, conservative: 8, foreign: 5 },
+    sample_quality: 'sufficient',
+    ad_allowed: true,
+    category: 'economy',
+    trust_tags: ['investment'],
+  },
+  {
+    cluster_id: '00000000-0000-4000-8000-000000000017',
+    title: '한미 관세 협상 잠정 타결 — 15%→8% 인하',
+    base_coverage: { progressive: 6, mixed: 8, conservative: 5, foreign: 9 },
+    sample_quality: 'sufficient',
+    ad_allowed: false,
+    category: 'international',
+  },
+  {
+    cluster_id: '00000000-0000-4000-8000-000000000018',
+    title: '부동산 PF 정상화 기금 5조 조성',
+    base_coverage: { progressive: 4, mixed: 7, conservative: 5, foreign: 2 },
+    sample_quality: 'sufficient',
+    ad_allowed: true,
+    category: 'economy',
+    trust_tags: ['investment'],
+  },
+  {
+    cluster_id: '00000000-0000-4000-8000-000000000019',
+    title: 'KSTAR 핵융합 30초 운전 신기록 달성',
+    base_coverage: { progressive: 2, mixed: 3, conservative: 1, foreign: 4 },
+    sample_quality: 'sufficient',
+    ad_allowed: true,
+    category: 'tech_science',
+  },
+  {
+    cluster_id: '00000000-0000-4000-8000-000000000020',
+    title: '개인정보보호위, 빅테크 과징금 1,200억 부과',
+    base_coverage: { progressive: 4, mixed: 5, conservative: 3, foreign: 6 },
+    sample_quality: 'sufficient',
+    ad_allowed: true,
+    category: 'society',
   },
 ] as const
 
@@ -218,15 +280,19 @@ export function rotateClusters(now: Date, count: number): WidgetCluster[] {
   const out: WidgetCluster[] = []
   for (let i = 0; i < count; i += 1) {
     const seed = POOL[(start + i) % POOL_SIZE]!
+    const cov = applyJitter(seed.base_coverage, minute, i)
     out.push({
       cluster_id: seed.cluster_id,
       title: seed.title,
-      coverage: applyJitter(seed.base_coverage, minute, i),
+      coverage: cov,
       sample_quality: seed.sample_quality,
       updated_at,
       ad_allowed: seed.ad_allowed,
       category: seed.category,
       previous_rank: rankAt(minute - 1, seed.cluster_id, count),
+      // v1.7.2 — Concept C 디자인용 신규 필드.
+      trust_tags: [...(seed.trust_tags ?? [])],
+      outlets_count: cov.progressive + cov.mixed + cov.conservative + cov.foreign,
     })
   }
   return out
