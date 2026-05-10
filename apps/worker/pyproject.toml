@@ -8,13 +8,14 @@ license = { text = "MIT" }
 readme = "README.md"
 
 dependencies = [
-    "httpx>=0.28",          # RSS fetch
+    "httpx>=0.28",          # RSS fetch + HTML fetch (PR #23 ingest)
     "feedparser>=6.0",      # RSS XML 파싱
     "pyyaml>=6.0",          # config/sources_whitelist.yaml 로드
-    "pydantic>=2.10",       # source schema validation
+    "pydantic[email]>=2.10", # source schema validation + EmailStr
     "structlog>=25.1",      # JSON logging
     "rich>=13.9",           # CLI table 출력 (dry-run)
-    "supabase>=2.10",       # PR #23 진입 시 활용 (현 PR에서 import만)
+    "supabase>=2.10",       # PR #23 — articles INSERT (service_role)
+    "trafilatura>=1.12",    # PR #23 — HTML 본문 추출 (Korean 지원, RAM only)
 ]
 
 [project.scripts]

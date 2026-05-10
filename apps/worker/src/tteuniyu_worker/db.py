@@ -1,0 +1,107 @@
+# Supabase client wrapper — service_role only (CLAUDE.md rule 11)
+
+"""Supabase client wrapper.
+
+비협상 (CLAUDE.md rule 11) — service_role key만 사용. anon/authenticated 절대 X.
+client는 lazy init — env vars 미설정 시 None 반환 (CI dry-run 호환).
+
+PR #23 — articles INSERT만.
+PR #24 — clusters / cluster_articles INSERT.
+PR #25 — summaries INSERT + audit_logs INSERT.
+"""
+
+from __future__ import annotations
+
+import os
+from datetime import datetime
+from functools import lru_cache
+from typing import Any
+
+import structlog
+from pydantic import BaseModel, ConfigDict, HttpUrl
+from supabase import Client, create_client
+
+logger = structlog.get_logger(__name__)
+
+
+class ArticleInsert(BaseModel):
+    """articles INSERT 페이로드.
+
+    비협상.
+      - rule 2 — body 컬럼 부재 (extract.py 결과는 RAM에서만, DB 적재 X)
+      - rule 3 — image URL 컬럼 부재
+      - rule 9 — body_summary는 PR #25 LLM 호출 시 채워짐 (현 PR에서는 None)
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    source_slug: str
+    url: HttpUrl
+    headline: str
+    published_at: datetime
+    # body_summary 등 LLM 산출물은 PR #25에서 별도 UPDATE
+
+
+@lru_cache(maxsize=1)
+def get_client() -> Client | None:
+    """env 기반 lazy Supabase client.
+
+    SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY 둘 다 설정 시 client 반환.
+    하나라도 없으면 None — caller가 dry-run mode 분기.
+    """
+
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+    if not url or not key:
+        logger.warning(
+            "db.client.no_env",
+            note="SUPABASE_URL 또는 SUPABASE_SERVICE_ROLE_KEY 미설정 — dry-run mode",
+        )
+        return None
+
+    return create_client(url, key)
+
+
+async def insert_articles(payloads: list[ArticleInsert]) -> dict[str, Any]:
+    """articles 테이블 일괄 INSERT.
+
+    UNIQUE (url) 제약 위반 시 supabase-py가 ON CONFLICT 처리 — 자세한 정책은
+    PR #24/#25에서 upsert 모드로 통합 결정.
+
+    client 부재 시 dry-run 결과 반환 (실 INSERT 없음).
+    """
+
+    if not payloads:
+        return {"mode": "noop", "attempted": 0, "inserted": 0}
+
+    client = get_client()
+    if client is None:
+        logger.info(
+            "db.insert_articles.dry_run",
+            count=len(payloads),
+            sample_urls=[str(p.url) for p in payloads[:3]],
+        )
+        return {"mode": "dry_run", "attempted": len(payloads), "inserted": 0}
+
+    rows = [
+        {
+            "source_slug": p.source_slug,
+            "url": str(p.url),
+            "headline": p.headline,
+            "published_at": p.published_at.isoformat(),
+        }
+        for p in payloads
+    ]
+
+    try:
+        # supabase-py는 동기 — async wrapper는 PR #24에서 검토.
+        # P0a Sprint 0 진입 시 asyncpg 직접 사용도 고려.
+        response = client.table("articles").upsert(rows, on_conflict="url").execute()
+    except Exception as err:
+        logger.error("db.insert_articles.failed", error=str(err), count=len(payloads))
+        return {"mode": "live", "attempted": len(payloads), "inserted": 0, "error": str(err)}
+
+    inserted = len(response.data) if response.data else 0
+    logger.info("db.insert_articles.ok", attempted=len(payloads), inserted=inserted)
+    return {"mode": "live", "attempted": len(payloads), "inserted": inserted}

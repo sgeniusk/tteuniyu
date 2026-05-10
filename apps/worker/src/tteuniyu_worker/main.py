@@ -169,6 +169,7 @@ def cli() -> None:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
+    # dry-run — RSS 응답·entry 수만 확인 (DB·HTML 적재 X)
     sub_dry = sub.add_parser("dry-run", help="active sources RSS fetch + 결과 출력 (DB 적재 X)")
     sub_dry.add_argument(
         "--whitelist",
@@ -183,12 +184,40 @@ def cli() -> None:
         help="동시 fetch 개수 (default: 6, 매체 부하 고려)",
     )
 
+    # ingest (PR #23) — RSS + HTML 본문 추출 (RAM only) + articles INSERT (메타만)
+    sub_ing = sub.add_parser(
+        "ingest",
+        help="active sources RSS fetch + HTML 본문 추출 (RAM only) + articles INSERT",
+    )
+    sub_ing.add_argument(
+        "--whitelist",
+        type=Path,
+        default=Path("config/sources_whitelist.yaml"),
+        help="whitelist 파일 경로",
+    )
+    sub_ing.add_argument(
+        "--max-concurrent",
+        type=int,
+        default=4,
+        help="동시 ingest 개수 (default: 4, HTML fetch 포함)",
+    )
+
     args = parser.parse_args()
     configure_logging()
 
     if args.command == "dry-run":
         exit_code = asyncio.run(run_dry(args.whitelist, args.max_concurrent))
         sys.exit(exit_code)
+
+    if args.command == "ingest":
+        from tteuniyu_worker.ingest import render_summary, run_ingest
+        from tteuniyu_worker.sources import filter_active, load
+
+        whitelist = load(args.whitelist)
+        active = filter_active(whitelist)
+        stats = asyncio.run(run_ingest(active, args.max_concurrent))
+        fail_count = render_summary(stats)
+        sys.exit(fail_count)
 
     parser.print_help()
     sys.exit(2)

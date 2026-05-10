@@ -14,9 +14,9 @@ yaml 파일은 단일 진실 — TS 검증 + Python 로드 둘 다 같은 파일
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Union
 
 import structlog
 import yaml
@@ -70,7 +70,7 @@ class Whitelist(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     version: int = Field(ge=1)
-    last_updated: str  # YYYY-MM-DD 또는 ISO datetime — yaml 파싱 후 str
+    last_updated: Union[date, datetime, str]  # yaml은 date 자동 파싱, ISO str도 허용
     sources: list[Source] = Field(min_length=15)
 
 
