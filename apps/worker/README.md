@@ -26,20 +26,31 @@ cd apps/worker
 uv sync                  # .venv 자동 생성 + lockfile 동기화
 ```
 
-### 3. RSS dry-run 실행
+### 3. Subcommands
+
+#### `dry-run` — RSS fetch만 (DB·HTML 적재 X, PR #22)
 
 ```bash
-# 저장소 루트에서 실행 (whitelist 경로가 cwd 기반 default)
 cd /path/to/tteuniyu
 uv --directory apps/worker run worker dry-run
 ```
 
-또는 직접.
+#### `ingest` — RSS + HTML 본문 추출 (RAM only) + articles INSERT (PR #23)
 
 ```bash
-cd apps/worker
-uv run worker dry-run --whitelist ../../config/sources_whitelist.yaml
+# Supabase 키 미설정 시 dry-run mode로 fall-back (실 INSERT X, log만)
+uv --directory apps/worker run worker ingest
+
+# Supabase 키 설정 후 실 INSERT
+SUPABASE_URL=https://xxx.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=eyJxxx \
+uv --directory apps/worker run worker ingest
 ```
+
+**비협상**.
+- 본문은 **RAM에서만** 처리 후 즉시 GC (rule 2 — body DB 저장 X)
+- INSERT 컬럼은 source_slug + url + headline + published_at만
+- body_summary는 PR #25 LLM 호출 시 채워짐
 
 ### 4. 출력 예 (active source 0개일 때)
 
