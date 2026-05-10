@@ -145,3 +145,83 @@ Client /widget Page
 - PRD v1.6 §11.3.2 `assert-affiliate-link-provenance.ts`
 - ADR-001 Data Licensing (v1.3) — 저장 가능 데이터 원칙 (본 ADR에서 확장)
 - ADR-005 Ad Zone Separation — 렌더 영역 경계 (본 ADR은 데이터 경계)
+
+---
+
+## Amendment 1 (2026-05-10, P0w D7+2) — 변호사 자문 반영
+
+> **Status**: Accepted
+> **Decider**: 태욱 (Founder)
+> **Driving source**: `docs/legal/2026-05-10-legal-response-opinion.md` §3 (line 312-381)
+> **근거 법령**: 표시광고법 §3, 전자상거래법 §13, 공정거래위원회 추천·보증 광고 기준 (2024-12-01 시행)
+
+### A1.1 표시 문구 강화 (의견서 §3.1)
+
+기존 — "이 카드는 제휴 링크입니다 (쿠팡 파트너스)"
+
+신규 표준 — "광고/제휴 링크 안내 — 이 카드를 통해 상품을 구매하면 뜬이유는 쿠팡 파트너스 활동의 일환으로 일정액의 수수료를 제공받을 수 있습니다."
+
+### A1.2 표시 위치 — Multi-touchpoint (의견서 §3.2)
+
+카드 하단만으로 약함. 다음 3 위치에 동시 표시.
+
+| 위치 | 표기 |
+|---|---|
+| **카드 상단 라벨** | "광고·제휴" (배지 형태) |
+| **CTA 버튼 근처** | 수수료 문구 ("쿠팡 파트너스 활동의 일환으로 수수료 제공받을 수 있음") |
+| **카드 하단** | 제휴 플랫폼명 + 외부 쇼핑몰 이동 안내 |
+
+hover tooltip 또는 약관 내부에만 숨기는 방식 절대 X.
+
+### A1.3 민감 카테고리 자동 제외 — 5개 → 18+개 (의견서 §3.5)
+
+기존 자동 제외 5개.
+- 정치 / 선거 / 사고 / 재해 / 의료
+
+추가 13개 (의견서 권고).
+- 종교·이단·사이비
+- 성범죄·아동·학교폭력·미성년자
+- 사망·자살·실종
+- 금융·투자·보험·대출·가상자산
+- 부동산·전세·임대차 분쟁
+- 노동쟁의·파업·산재
+- 법적 분쟁·수사·재판
+- 외교·국방·안보
+- 젠더·혐오·차별
+- 공중보건·감염병
+
+총 **18+ 카테고리** 자동 제외 (자동 매칭 X, 수동 큐레이션도 비노출).
+
+### A1.4 affiliate_url 처리 보강 (의견서 §3.4)
+
+추가 권고.
+- 링크 cloaking 금지
+- shortener 금지
+- 자체 tracking parameter 추가 금지
+- raw affiliate API payload 저장 금지 (기존 §Storage Prohibition과 정합)
+- 클릭 로그 최소 정보만 (timestamp + cluster_id + offer_id, IP/UA X)
+- 외부 쇼핑몰 이동 고지
+
+### A1.5 시각 강조 제한 (의견서 §3.3)
+
+상품 카드가 분석 카드보다 시각적으로 더 강조되지 않도록 제한.
+- 상품 카드 폰트 크기 ≤ 분석 카드
+- 상품 카드 보더 굵기 ≤ 분석 카드
+- 상품 카드 배경 색상 — 베이스(slate-900)와 동등 또는 약간 흐림
+
+### A1.6 harness 갱신 (PR #19 또는 Sprint 0)
+
+`harness:affiliate-link-provenance` 추가 검사.
+- multi-touchpoint 표시 검증 — `<AffiliateCard>`가 상단 라벨 + CTA 근처 + 하단 모두에 표시
+- 18+ 민감 카테고리 자동 제외 검증 — 카테고리 매칭 시 `is_affiliate_blocked=true`
+
+### A1.7 영향 받는 코드
+
+| 대상 | 변경 |
+|---|---|
+| `apps/web/components/AffiliateCard.tsx` | Multi-touchpoint 표시 (상단 라벨 + CTA + 하단) |
+| `apps/web/lib/affiliate/curation.ts` | 18+ 민감 카테고리 자동 차단 검증 추가 |
+| `config/affiliate_manual_curation.yaml` | 18+ 카테고리 운영자 가이드 + 차단 사유 기록 필드 |
+| `harness/checks/assert-affiliate-link-provenance.ts` | A1.6 신규 검사 |
+
+**End of Amendment 1 — 2026-05-10**

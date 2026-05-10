@@ -263,3 +263,166 @@ Status: Accepted
 ```
 
 **End of ADR-015 — 2026-05-09**
+
+---
+
+## Amendment 2 (2026-05-10, P0w D7+2) — 변호사 자문 반영
+
+> **Status**: Accepted
+> **Decider**: 태욱 (Founder)
+> **Driving source**: `docs/legal/2026-05-10-legal-response-opinion.md` (740줄)
+> **Effective scope**: ADR-015 §1 (자본시장법 영역) + §2.1 (Trust Tag UI 노출) + §2.2 (Investment 카드)
+
+### A2.1 카드 명칭·라벨 폐기 (의견서 §1.7, line 208-217)
+
+다음 명칭·라벨을 **모두 폐기**한다.
+
+| 폐기 | 대체 |
+|---|---|
+| `<InvestmentImpactCard />` | `<IssueContextCard />` (일반 이슈 맥락) 또는 `<CompanyContextCard />` (기업 관련) |
+| "💰 투자 정보" | 🏢 "기업 관련 이슈" / 📄 "공시·보도 맥락" / 🌐 "외신·공개자료 요약" |
+| "투자 영향" | "이슈 맥락 요약" |
+| "관련 종목" | "이슈에 언급된 상장사" |
+| "분석가 의견" | (P0a에서는 제외 또는 "외부 매체 보도 인용" 간접 귀속만) |
+| "주가 민감도" / "투자자 체크포인트" | (전부 X) |
+
+근거 — Pro+ 차별화는 "투자 분석"이 아니라 "더 많은 출처 / 원문 링크 묶음 / 공시·보도 타임라인 / 외신 비교 / 정정·반박 이력 / 요약 export / 알림 개수"로 재정의한다 (의견서 §0.3, line 39-46).
+
+### A2.2 Trust Tag 외부 노출 라벨 변경 (의견서 §2.1, line 226-230)
+
+내부 field (`hoax`, `clickbait`, `low_confidence`, `investment`)는 그대로 유지. **사용자 노출 라벨만 변경**.
+
+```ts
+// 내부 (DB · schema · 코드) — 변경 없음
+type TrustTag = 'hoax' | 'clickbait' | 'low_confidence' | 'investment'
+
+// UI 표시 라벨 (변호사 권고)
+const TRUST_TAG_LABEL = {
+  hoax:           '검증 필요',                  // 이전 — "검증되지 않은 정보"
+  clickbait:      '제목-본문 괴리 가능성',       // 이전 — "낚시성 제목 가능성"
+  low_confidence: '표본 부족',                  // 이전 — "보도 출처 부족"
+  investment:     '기업 관련 이슈',             // 이전 — "투자 정보"
+}
+```
+
+태그 tooltip 표준 문구 — "이 표시는 개별 매체 평가가 아니라 수집된 보도 묶음에 대한 자동 분석 신호입니다."
+
+### A2.3 LLM Hard-block 단어 40+ 확장 (의견서 §1.3, line 99-156)
+
+`prompts/trust_signal_v1.md` + `prompts/issue_context_v1.md` output validator에 다음 단어 0건 강제.
+
+```
+투자행동성 — 매수, 매도, 보유, 진입, 청산, 비중확대, 비중축소, 손절, 익절, 물타기, 관망
+가격·수익성 — 목표가, 수익률, 상승 여력, 하락 위험, 급등, 급락, 반등, 조정, 상방, 하방
+가치판단성 — 호재, 악재, 저평가, 고평가, 유망, 모멘텀, 리레이팅, 촉매
+영문 — buy, sell, hold, overweight, underweight, outperform, underperform,
+       target price, upside, downside, alpha
+```
+
+허용 표현 — 기업 관련 이슈, 공개자료 요약, 공시·보도 맥락, 외신 보도 비교, 출처별 사실관계, 확인 한계, 이슈 타임라인, 공개 출처.
+
+### A2.4 종목코드 노출 규칙 (의견서 §1.4, line 158-172)
+
+- 종목코드 자체 금지 X. 단 다음 조건.
+  - "관련 종목" → "이슈에 언급된 상장사"로 라벨 변경
+  - 종목코드는 원문 공시·기사에 등장한 경우 보조 정보로만
+  - 종목코드 옆에 가격·등락률·차트·목표가 결합 X
+  - 종목코드를 검색·추천·알림 중심축으로 X
+- 예시 — "이슈에 언급된 상장사 — 삼성전자 (DART 공시 및 Reuters 보도에 언급됨)"
+
+### A2.5 메타데이터 필드 확장 (의견서 §1.5, line 175-188)
+
+기존 `prompt_version`/`model`/`output_hash` 외 다음 audit log 필드를 cluster summary 메타에 추가.
+
+```ts
+interface SummaryAuditLog {
+  source_url: string
+  source_published_at: string
+  summary_generated_at: string
+  model: string
+  prompt_version: string
+  validator_version: string
+  copy_ratio: number
+  blocked_terms_result: 'pass' | 'blocked' | 'unknown'
+  human_review_required: boolean
+  correction_history: Array<{ requested_at: string; reason: string; resolution?: string }>
+}
+```
+
+이 audit log는 면책 수단이 아니라 사후 검증·분쟁 대응용 (의견서 line 177).
+
+### A2.6 SNS 공유 카드 자동 삽입 (의견서 §1.6, line 192-206)
+
+OG 카드(`/cluster/[id]/og`) 렌더링 시 다음 요소를 **자동 포함** (사용자 권장 X, 시스템 강제).
+
+- "뜬이유 AI 공개자료 요약"
+- 원출처 매체명
+- 생성일시
+- 원문 링크
+- "투자판단 정보 아님" 고지
+
+문구 표준 — "이 콘텐츠는 공개 보도·공시·발표자료를 요약한 것이며, 금융투자상품의 가치·가격·매매판단을 제공하지 않습니다."
+
+### A2.7 자체 모니터링 정책 (의견서 §2.5, line 279-288)
+
+사용자 신고 의존만으로 부족. **자동 사람 검토 큐** 진입 조건.
+
+- "검증 필요" 태그 (구 hoax)
+- "제목-본문 괴리 가능성" 태그 (구 clickbait)
+- 단일 출처
+- 정치·선거·범죄·사망·재난·의료·금융 카테고리
+- 매체·당사자 정정 요청 접수
+- copy ratio 기준 (15%) 초과
+
+### A2.8 자본시장법 고지 표준 문구 갱신 (의견서 §7.3, line 632-643)
+
+기존 — "⚠ 자본시장법상 투자 자문이 아닙니다. 신중히 판단하세요."
+
+신규 권고 — "이 카드는 이슈 이해를 돕기 위해 공개 보도·공시·발표자료를 요약한 것입니다. 금융투자상품의 가치, 가격, 매매 시점, 취득·처분 판단을 제공하지 않습니다."
+
+### A2.9 비협상 추가 (CLAUDE.md 15조 amendment 동반, PR #18)
+
+- 가격·시세·차트·매수/매도/보유/비중·수익률·전망·목표가 일체 금지 (V0.5+ ADR-016 별도 발의 후)
+- 사용자 투자목적·재산상황·투자경험·보유종목 입력 절대 X (개인화 분석 차단)
+- "분석가 의견 요약"은 P0a에서 제외. P1 이후 "외부 매체 보도 인용" 형태로만 (LLM이 직접 의견 생성 X)
+
+### A2.10 ADR-015 §2.1 §2.2 갱신 (이번 amendment 적용 매트릭스)
+
+| 원본 §2.1 (구) | Amendment 2 (신) |
+|---|---|
+| Trust Tag — UI 노출 라벨에 hoax/clickbait/low_confidence 직접 사용 | 내부 field로만, UI 라벨은 검증 필요/제목-본문 괴리 가능성/표본 부족 |
+| 우선순위 hoax > clickbait > low_confidence > investment | 동일 |
+
+| 원본 §2.2 (구) | Amendment 2 (신) |
+|---|---|
+| `<InvestmentImpactCard>` Pro+ 노출 (4 항목 — 종목, 외신, 공시, 분석가 의견) | `<IssueContextCard>` / `<CompanyContextCard>` Pro+ 노출 (3 항목 — 이슈에 언급된 상장사, 외신 비교, 공시·발표 요약). 분석가 의견 P0a에서 X |
+| 자본시장법 고지 — "⚠ 투자 자문이 아닙니다" | 신규 표준 문구 (A2.8 참조) |
+| Pro 가치 — 투자 분석 | 출처 깊이 (더 많은 출처 / 원문 묶음 / 타임라인 / 외신 / 정정 이력 / export / 알림) |
+
+### A2.11 영향 받는 ADR / 코드 / harness
+
+| 대상 | 변경 |
+|---|---|
+| ADR-007 | Amendment 1 (PR #16에 동반) — 표시 multi-touchpoint + 민감 카테고리 18+ |
+| ADR-011 | Amendment 1 (PR #16에 동반) — 자동전환 30일 분리 + 코인 ledger + 만 14세 미만 |
+| PRD v1.7 §9 Monetization | v1.7.2 patch (PR #17) — Pro+ 가치 재정의 |
+| PRD v1.7.1 §3.3 | v1.7.2 patch — InvestmentImpactCard → IssueContextCard 리네이밍 |
+| CLAUDE.md 비협상 15조 + Naming Ban | PR #18 — hard-block 40+ + Trust Tag UI 라벨 + 카드명 변경 |
+| harness:no-stance-color | PR #14 (이미) |
+| harness:trust-tag-presence | PR #14 (이미) |
+| harness:investment-language-block | 신규 (PR #20 또는 Sprint 0) — 40+ 단어 LLM output 차단 검증 |
+| 컴포넌트 — `<TrustTag>` | UI 라벨 매핑 변경 (PR #20) |
+| 컴포넌트 — `<InvestmentImpactCard>` | 폐기 + `<IssueContextCard>` 신규 (PR #20 또는 P0a) |
+
+### A2.12 마이그레이션 시퀀스
+
+| PR | 범위 |
+|---|---|
+| #16 (이번) | 본 Amendment 2 + ADR-007 Amendment 1 + ADR-011 Amendment 1 |
+| #17 | PRD v1.7.2 patch (Monetization 재정의 + 카드명 + Trust Tag UI) |
+| #18 | CLAUDE.md 15조 amendment + Naming Ban 확장 (hard-block 40+) |
+| #19 | Privacy policy + ADR-016 Privacy & Data Boundary |
+| #20 | Widget Concept C 디자인 구현 (변호사 라벨 자동 적용 + TrustTag 컴포넌트 매핑 변경) |
+| P0a | LLM 워커에 hard-block validator + audit log 메타데이터 + 자동 검토 큐 |
+
+**End of Amendment 2 — 2026-05-10**
