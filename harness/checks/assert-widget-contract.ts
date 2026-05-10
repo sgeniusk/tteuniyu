@@ -54,9 +54,10 @@ const SCHEMA_BY_SIZE = {
     clusters: z.array(ClusterSchema).length(3),
     updated_at: z.string(),
   }),
-  // v1.6.1 patch: Top 10 (was 5)
+  // v1.6.1 patch: Top 10 (was 5).
+  // v1.7.2 patch: Top 20 (Concept C 디자인, Claude Design 2026-05-10).
   large: z.object({
-    clusters: z.array(ClusterSchema).length(10),
+    clusters: z.array(ClusterSchema).length(20),
     methodology_version: z.string(),
     overall_diversity_index: z.number().min(0).max(1).nullable(),
     updated_at: z.string(),

@@ -6,14 +6,19 @@
  * v1.6.2 patch: Coverage Bar hidden on this surface (shown in /cluster/[id]).
  * T-W03: Footer preorder callouts open ProWaitlist / CreatorWaitlist /
  *        B2BInquiry modals (forms wired up).
+ * v1.7.2 (Concept C, Claude Design 2026-05-10):
+ *  - Top 10 → Top 20
+ *  - 카드 — IssueCard → ConceptCCard (rank column + content)
+ *  - AdZone — 1개 → 3개 (rank 6/7, 12/13, 16/17)
+ *  - TrustTag UI 라벨 변호사 권고 매핑 (검증 필요/제목-본문 괴리 가능성/표본 부족/기업 관련 이슈)
  *
  * Server Component shell:
- * - SSR initial Top 10 fetch (instant first paint)
+ * - SSR initial Top 20 fetch (instant first paint)
  * - <RisingIssuesList> client island handles polling + trend arrows
  * - <PreorderCallouts> client island hosts the three modals
  *
- * NO AdZone here in this PR (T-W04 lands the AdZone slot above the
- * footer, between rank 5 and 6 inside RisingIssuesList).
+ * AdZone 위치 — RisingIssuesList 내부 rank 6/7, 12/13, 16/17 사이.
+ * /cluster/[id] 디테일 페이지에는 AdZone 절대 X (P12, ADR-005).
  */
 
 import type { Metadata } from 'next'
@@ -66,7 +71,7 @@ export default async function WidgetPage() {
           </p>
           <h1 className="text-display-md font-pretendard">한국 이슈 리스크 OS</h1>
           <p className="text-body-md text-slate-400">
-            5초에 파악, 5분에 분석, 5초 안에 콘텐츠로 — 60초마다 자동 갱신
+            지금 뜨는 이유 — TOP 20 · 60초마다 자동 갱신
           </p>
         </header>
 

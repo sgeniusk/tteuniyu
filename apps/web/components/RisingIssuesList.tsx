@@ -1,11 +1,19 @@
 /**
- * Client-side polling list for /widget.
+ * Client-side polling list for /widget — Concept C 디자인 (v1.7.2, 2026-05-10).
  *
- * SSR delivers initial Top 10 (instant first paint, SEO).
+ * SSR delivers initial Top 20 (instant first paint, SEO).
  * Then polls /api/v1/widget/top?size=large every 60s (PRD v1.6 §6.1).
  *
- * Polling pauses while the tab is hidden (Page Visibility API) to spare
- * server resources during idle browser tabs.
+ * Concept C 디자인 변경 (Claude Design 2026-05-10).
+ *  - Top 10 → Top 20 (사용자 요청, 카드 압축으로 한 화면 적합)
+ *  - 카드 컴포넌트 — IssueCard → ConceptCCard (rank column + content)
+ *  - AdZone 1개 → 3개 (rank 6/7, 12/13, 16/17 사이)
+ *  - 매체 dot slate-400 단일 (ADR-009 Amendment 1)
+ *  - TrustTag UI 라벨 변호사 권고 매핑 (ADR-015 Amendment 2)
+ *
+ * Polling pauses while the tab is hidden (Page Visibility API).
+ *
+ * Defer to PR #21 / P0a — 카테고리 탭 필터 (6 tabs), 폴링 셔플 시뮬레이션.
  */
 
 'use client'
@@ -14,8 +22,9 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   WidgetLargeResponseSchema,
   type WidgetLargeResponse,
+  type WidgetCluster,
 } from '@/lib/api/widget-schemas'
-import { IssueCard } from '@/components/IssueCard'
+import { ConceptCCard } from '@/components/ConceptCCard'
 import { AdZone } from '@/components/AdZone'
 import { AffiliateCard } from '@/components/AffiliateCard'
 import { relativeTime } from '@/lib/format'
@@ -26,6 +35,9 @@ interface RisingIssuesListProps {
 }
 
 const DEFAULT_INTERVAL_MS = 60_000
+
+/** AdZone 삽입 위치 — rank 6/7, 12/13, 16/17 사이 (Claude Design 권고). */
+const AD_INSERT_AFTER_RANKS = [6, 12, 16] as const
 
 export function RisingIssuesList({
   initial,
@@ -77,11 +89,13 @@ export function RisingIssuesList({
     return () => clearInterval(t)
   }, [])
 
-  // T-W04: pick the first cluster (by rank) whose affiliate_slot is enabled
-  // for the inline AdZone shown between rank 5 and 6.
-  // ADR-007 + PRD §9.7: API has already enforced ad_allowed=false for
-  // politics/military/medical, so this find naturally skips them.
-  const adClusterForSlot = useMemo(
+  /**
+   * 3 AdZones — 첫 번째 affiliate_slot.enabled 클러스터 1건을 모든 슬롯에 재사용.
+   * (P0w mock — 운영자 수동 큐레이션 1일 1회 한정. P0a 워커는 슬롯별 다른 매물).
+   * ADR-007 + PRD §9.7 — politics/military/medical은 ad_allowed=false → API에서
+   * 이미 affiliate_slot 미부여 → defense in depth.
+   */
+  const adClusterForSlot = useMemo<WidgetCluster | undefined>(
     () => data.clusters.find((c) => c.affiliate_slot?.enabled),
     [data.clusters],
   )
@@ -113,34 +127,35 @@ export function RisingIssuesList({
       </div>
 
       <ol
-        aria-label="실시간 이슈 Top 10"
-        className="grid grid-cols-1 gap-1 md:grid-cols-2 md:gap-x-4 md:gap-y-1"
+        aria-label="실시간 이슈 Top 20"
+        className="grid grid-cols-1 gap-1 md:grid-cols-2 md:gap-x-3 md:gap-y-1"
       >
-        {data.clusters.map((cluster, idx) => (
-          <Fragment key={cluster.cluster_id}>
-            <li>
-              <IssueCard cluster={cluster} rank={idx + 1} />
-            </li>
-            {/*
-              T-W04: AdZone between rank 5 and 6 (replaces v1.6.2 hidden marker).
-              Renders only when a curated affiliate slot is available;
-              spans both grid columns on md+ for visual separation.
-            */}
-            {idx === 4 && adClusterForSlot?.affiliate_slot && (
-              <li className="md:col-span-2">
-                <AdZone
-                  slot="affiliate"
-                  cluster_id={adClusterForSlot.cluster_id}
-                >
-                  <AffiliateCard
-                    slot={adClusterForSlot.affiliate_slot}
-                    cluster_id={adClusterForSlot.cluster_id}
-                  />
-                </AdZone>
+        {data.clusters.map((cluster, idx) => {
+          const rank = idx + 1
+          const showAd =
+            AD_INSERT_AFTER_RANKS.includes(rank as 6 | 12 | 16) &&
+            adClusterForSlot?.affiliate_slot
+          return (
+            <Fragment key={cluster.cluster_id}>
+              <li>
+                <ConceptCCard cluster={cluster} rank={rank} />
               </li>
-            )}
-          </Fragment>
-        ))}
+              {showAd && adClusterForSlot?.affiliate_slot && (
+                <li className="md:col-span-2">
+                  <AdZone
+                    slot="affiliate"
+                    cluster_id={adClusterForSlot.cluster_id}
+                  >
+                    <AffiliateCard
+                      slot={adClusterForSlot.affiliate_slot}
+                      cluster_id={adClusterForSlot.cluster_id}
+                    />
+                  </AdZone>
+                </li>
+              )}
+            </Fragment>
+          )
+        })}
       </ol>
     </>
   )
