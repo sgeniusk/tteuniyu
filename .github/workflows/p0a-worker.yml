@@ -1,0 +1,65 @@
+name: p0a-worker
+
+# T-006 P0a Foundation — RSS 워커 GHA cron.
+#
+# PR #22 (현재) — workflow_dispatch만 (manual trigger). cron은 주석 처리.
+# PR #23/#24 진입 후 cron 활성화.
+#
+# Secrets 등록 (repo Settings → Secrets and variables → Actions).
+#  필수 (PR #23+) — SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+#  필수 (PR #24+) — GEMINI_API_KEY
+#  권장 — SLACK_WEBHOOK_URL (ADR-014 비용 cap alert)
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 워커 subcommand
+        required: true
+        default: dry-run
+        type: choice
+        options:
+          - dry-run
+  # PR #23+ 진입 후 cron 활성화 (5분마다).
+  # schedule:
+  #   - cron: '*/5 * * * *'
+
+# 동일 워크플로우 동시 실행 방지 (cron 중복 방지)
+concurrency:
+  group: p0a-worker
+  cancel-in-progress: false
+
+jobs:
+  worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: latest
+          enable-cache: true
+          cache-dependency-glob: apps/worker/uv.lock
+
+      - name: Install Python 3.12
+        run: uv python install 3.12
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Run command (${{ inputs.command }})
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          LOG_FORMAT: json
+          LOG_LEVEL: INFO
+        run: |
+          uv run worker ${{ inputs.command }} \
+            --whitelist ../../config/sources_whitelist.yaml

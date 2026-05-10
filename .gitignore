@@ -58,6 +58,17 @@ apps/android/.gradle/
 harness/reports/
 harness/.cache/
 
+# Python (apps/worker — T-006 P0a Foundation)
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+.uv-cache/
+
 # Temporary
 *.tmp
 *.swp
