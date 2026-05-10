@@ -1,0 +1,46 @@
+[project]
+name = "tteuniyu-worker"
+version = "0.1.0"
+description = "RSS 수집 + 클러스터링 + LLM 요약 워커 (P0a Foundation, T-006)"
+requires-python = ">=3.12"
+authors = [{ name = "김태욱", email = "sgeniusk@gmail.com" }]
+license = { text = "MIT" }
+readme = "README.md"
+
+dependencies = [
+    "httpx>=0.28",          # RSS fetch
+    "feedparser>=6.0",      # RSS XML 파싱
+    "pyyaml>=6.0",          # config/sources_whitelist.yaml 로드
+    "pydantic>=2.10",       # source schema validation
+    "structlog>=25.1",      # JSON logging
+    "rich>=13.9",           # CLI table 출력 (dry-run)
+    "supabase>=2.10",       # PR #23 진입 시 활용 (현 PR에서 import만)
+]
+
+[project.scripts]
+worker = "tteuniyu_worker.main:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tteuniyu_worker"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "ruff>=0.9",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]  # line-length은 line-length 옵션이 강제
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
