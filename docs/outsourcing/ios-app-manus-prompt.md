@@ -10,11 +10,36 @@
 
 ```
 You are tasked with building the initial version of an iOS app called "뜬이유" (TTEUN-IYU)
-— a Korean Issue Risk OS app. I am attaching the full RFP (Request for Proposal) as
-`ios-app-rfp.md` — read it completely before starting.
+— a Korean Issue Risk OS app. I am attaching 14 files total — read them in this order:
+
+  Tier 1 (NON-NEGOTIABLE — start here, in order):
+    1. docs/outsourcing/ios-app-rfp.md     ← main spec, read end-to-end first
+    2. CLAUDE.md                            ← 15 non-negotiable rules + 70+ banned words
+    3. docs/prd-v1.7.md                     ← product identity, personas, design tokens
+    4. docs/prd-v1.7.2-patch.md             ← lawyer-mandated changes (Trust Tag labels)
+    5. docs/legal/2026-05-10-legal-response-opinion.md  ← lawyer rationale (Korean)
+
+  Tier 2 (DESIGN):
+    6. docs/design-handoff/design-brief.md
+    7. docs/design-handoff/surface-checklist.md
+    8. apps/web/components/ConceptCCard.tsx ← card layout to translate to Swift
+
+  Tier 3 (CODE REFERENCE — translate to Swift):
+    9.  apps/web/components/TrustTag.tsx
+    10. apps/web/components/CategoryIcon.tsx
+    11. apps/web/components/RisingIssuesList.tsx
+    12. apps/web/lib/format.ts
+
+  Tier 4 (SCHEMA + POLICY):
+    13. apps/web/lib/api/widget-schemas.ts
+    14. docs/adr/ADR-006 + ADR-015
 
 ═══════════════════════════════════════════════════════════════════════════════
 한국어로 작업해도 좋고 영어로 작업해도 좋다. 단 UI 카피·문서·커밋 메시지는 한국어로.
+
+If you cannot find any of the 14 files, STOP and ask me. Do not start without all
+Tier 1 files. CLAUDE.md and the lawyer opinion are the most important — they define
+what you can and cannot write in UI labels, variable names, or comments.
 ═══════════════════════════════════════════════════════════════════════════════
 
 ## Your Goal
@@ -164,19 +189,59 @@ https://manus.im 에 로그인.
 
 채팅 입력창에 위 "📋 복사할 프롬프트" 영역 전체를 복사해서 붙여넣기.
 
-### 3. 파일 첨부
+### 3. 파일 첨부 (총 14개, Tier 분류)
 
-다음 파일을 task에 첨부.
+다음 파일을 task에 첨부. **Tier 1은 절대 빠지면 안 됨** — Manus가 비협상 위반할 위험이 매우 높아짐.
 
-- `docs/outsourcing/ios-app-rfp.md` (메인 spec)
-- `docs/design-handoff/design-brief.md` (디자인 토큰·컴포넌트)
-- `docs/design-handoff/surface-checklist.md` (화면별 체크)
-- `apps/web/components/TrustTag.tsx` (라벨 매핑 코드)
-- `apps/web/components/CategoryIcon.tsx` (SVG 아이콘 7종)
-- `apps/web/lib/api/widget-schemas.ts` (API schema)
-- `apps/web/components/ConceptCCard.tsx` (카드 레이아웃)
+#### Tier 1 — 필수 (5개)
 
-(파일이 GitHub에 있으면 Manus가 직접 fetch도 가능 — 단 메인 repo가 private이라 첨부가 안전.)
+| # | 파일 | 왜 필수 |
+|---|---|---|
+| 1 | `docs/outsourcing/ios-app-rfp.md` | 메인 spec — 모든 작업의 기준 |
+| 2 | `CLAUDE.md` | **비협상 15조 + Naming Ban 70+ 단어** — 위반 시 인수 거부 |
+| 3 | `docs/prd-v1.7.md` (590줄) | 제품 정체성·페르소나·디자인 토큰 §15 |
+| 4 | `docs/prd-v1.7.2-patch.md` (374줄) | 변호사 권고 종합 — Trust Tag 라벨 변경 + Pro+ 가치 재정의 |
+| 5 | `docs/legal/2026-05-10-legal-response-opinion.md` (740줄) | 변호사 의견서 원본 — 왜 그 라벨/금지 단어인지 근거 |
+
+#### Tier 2 — 디자인 (3개)
+
+| # | 파일 | 왜 |
+|---|---|---|
+| 6 | `docs/design-handoff/design-brief.md` | 디자인 토큰·컴포넌트 명세 |
+| 7 | `docs/design-handoff/surface-checklist.md` | 화면별 비협상 체크 |
+| 8 | `apps/web/components/ConceptCCard.tsx` | Concept C 카드 레이아웃 (Swift 직번역 reference) |
+
+#### Tier 3 — 구현 reference (4개)
+
+| # | 파일 | 왜 |
+|---|---|---|
+| 9 | `apps/web/components/TrustTag.tsx` | 라벨 매핑 코드 (Swift TrustTag.swift 직번역) |
+| 10 | `apps/web/components/CategoryIcon.tsx` | 7-enum SVG 아이콘 (Swift Path 변환 reference) |
+| 11 | `apps/web/components/RisingIssuesList.tsx` | 60s polling + AdZone 위치 + grid 패턴 |
+| 12 | `apps/web/lib/format.ts` | 한국어 시간 포맷 (`relativeTime` 등 — Swift DateFormatter 참고) |
+
+#### Tier 4 — schema + 정책 (2개)
+
+| # | 파일 | 왜 |
+|---|---|---|
+| 13 | `apps/web/lib/api/widget-schemas.ts` | API 응답 schema (Swift Codable 변환) |
+| 14 | `docs/adr/ADR-006-native-widget-staged-entry.md` + `docs/adr/ADR-015-trust-signal-and-investment-risk-layer.md` | iOS 진입 조건 + Trust Signal full spec (Amendment 2 포함) |
+
+#### 첨부 절차
+
+- **public repo 또는 read 권한 share** — Manus가 GitHub URL fetch 가능
+  - 본 패키지는 `https://github.com/sgeniusk/tteuniyu`에 공개됨 (PR #24 머지 후)
+  - Manus 채팅에 GitHub 파일 URL 14개 붙여넣기로 대체 가능
+- **private repo + 첨부** — 14개 파일을 zip으로 묶어서 Manus에 직접 첨부
+
+#### 첨부 안 한 파일 (의도적 제외)
+
+| 파일 | 제외 이유 |
+|---|---|
+| `apps/web/lib/api/cluster-schemas.ts` | ClusterDetailView가 native 구현 시 필요. 현 RFP는 WKWebView이라 X |
+| `apps/web/components/AdZone.tsx` | iOS 위젯에 광고 X (Apple ToS) — P12 패턴 알 필요 적음 |
+| `apps/web/components/IssueCard.tsx` | ConceptCCard (Concept C) 하나로 충분 |
+| `docs/privacy-policy-draft.md` | Settings 링크는 web URL로만 (`https://tteuniyu.com/privacy`) |
 
 ### 4. Manus 응답 기다리기
 
