@@ -22,8 +22,8 @@ on:
         options:
           - dry-run
           - ingest
-  # T-006 Step 4 cron 활성화 — 매 시간 dry-run (안전 default, active source 0개라 무동작).
-  # 사용자 source 활성화 + secrets 셋업 후 schedule 변경.
+          - cluster-pending
+  # T-006 Step 4 cron 활성화 — 매 시간 정각 ingest (cluster 자동화는 PR #48에서).
   schedule:
     - cron: '0 * * * *'  # 매 시간 정각 (UTC)
 
@@ -63,8 +63,20 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           LOG_FORMAT: json
           LOG_LEVEL: INFO
-        # schedule trigger 시 inputs 없음 → dry-run fallback
+        # schedule trigger 시 inputs 없음 → dry-run fallback.
+        # subcommand별 인자가 다르므로 분기 (dry-run/ingest는 --whitelist,
+        # cluster-pending은 --lookback-hours만 받음).
         run: |
           COMMAND="${{ inputs.command || 'dry-run' }}"
-          uv run worker "$COMMAND" \
-            --whitelist ../../config/sources_whitelist.yaml
+          case "$COMMAND" in
+            dry-run|ingest)
+              uv run worker "$COMMAND" --whitelist ../../config/sources_whitelist.yaml
+              ;;
+            cluster-pending)
+              uv run worker cluster-pending --lookback-hours 24
+              ;;
+            *)
+              echo "Unknown command: $COMMAND"
+              exit 2
+              ;;
+          esac
