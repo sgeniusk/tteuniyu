@@ -1,0 +1,71 @@
+name: p0a-cluster
+
+# T-006 P0a Foundation — cluster-pending 자동 cron.
+#
+# ingest와 분리 (p0a-worker.yml은 매시 정각 ingest만). cluster는 매시 30분에
+# 별도 워크플로우로 실행 — sentence-transformers + torch 무거운 의존성을
+# ingest 워크플로우에 매시 다운받게 만들지 않기 위함.
+#
+# 시간차 (정각 ingest → 30분 cluster) — 신규 article들이 적재 완료된 후
+# 클러스터링 시작. articles 테이블에 새 데이터 들어가는 사이 30분 마진.
+#
+# Secrets — SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (필수).
+
+on:
+  workflow_dispatch:
+    inputs:
+      lookback_hours:
+        description: 'cluster-pending lookback (시간)'
+        required: false
+        default: '24'
+  schedule:
+    - cron: '30 * * * *'  # 매 시간 30분 (UTC)
+
+# 동일 워크플로우 동시 실행 방지
+concurrency:
+  group: p0a-cluster
+  cancel-in-progress: false
+
+jobs:
+  cluster:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15  # sentence-transformers 첫 모델 다운로드 여유
+    defaults:
+      run:
+        working-directory: apps/worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: latest
+          enable-cache: true
+          cache-dependency-glob: apps/worker/uv.lock
+
+      - name: Install Python 3.12
+        run: uv python install 3.12
+
+      # cluster-pending 전용 — sentence-transformers 등 ML deps 포함.
+      - name: Sync dependencies (with embedding extra)
+        run: uv sync --frozen --extra embedding
+
+      # HuggingFace 모델 캐시 — paraphrase-multilingual-MiniLM-L12-v2 약 470MB.
+      # 첫 실행만 다운로드, 이후 cache hit으로 30초 내 부팅.
+      - name: Cache HuggingFace models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-paraphrase-multilingual-MiniLM-L12-v2-v1
+
+      - name: Run cluster-pending
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          LOG_FORMAT: json
+          LOG_LEVEL: INFO
+          EMBEDDING_BACKEND: sentence_transformers
+          CLUSTERING_BACKEND: agglomerative
+        run: |
+          LOOKBACK="${{ inputs.lookback_hours || '24' }}"
+          uv run worker cluster-pending --lookback-hours "$LOOKBACK"
