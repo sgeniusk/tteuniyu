@@ -244,6 +244,12 @@ def cli() -> None:
     )
     sub_dig.add_argument("--dry-run", action="store_true", help="실 발송 X (stub backend 강제)")
 
+    # match-topics (ADR-018) — Custom Topic 매칭 cycle (mock or Supabase)
+    sub_match = sub.add_parser(
+        "match-topics",
+        help="Custom Topic ↔ 신규 cluster 매칭 (TOPIC_MATCHER_BACKEND=stub|supabase)",
+    )
+
     args = parser.parse_args()
     configure_logging()
 
@@ -349,6 +355,17 @@ def cli() -> None:
             if r.error:
                 console.print(f"     [red]error: {r.error}[/red]")
         sys.exit(0 if ok == len(results) else 1)
+
+    if args.command == "match-topics":
+        from tteuniyu_worker.topic_matcher import run_matching_cycle
+
+        stats = run_matching_cycle()
+        console.print(f"[green]✅ match-topics[/green]")
+        console.print(
+            f"  topics={stats['topics']} / clusters={stats['clusters']} / "
+            f"matches={stats['matches']} / inserted={stats['inserted']}"
+        )
+        sys.exit(0)
 
     parser.print_help()
     sys.exit(2)
