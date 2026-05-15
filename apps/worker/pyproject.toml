@@ -20,13 +20,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# 실 운영 단계 — 무거운 ML deps. CI는 stub backend로 작동.
-# 사용 — uv sync --extra embedding --extra clustering
+# 실 운영 단계 — 무거운 ML/LLM deps. CI는 stub backend로 작동.
+# 사용 — uv sync --extra embedding --extra clustering --extra llm
 embedding = [
     "sentence-transformers>=3.0",  # paraphrase-multilingual-MiniLM-L12-v2
 ]
 clustering = [
     "scikit-learn>=1.5",  # HDBSCAN
+]
+llm = [
+    "google-generativeai>=0.8",  # Gemini 2.0 Flash (T-006 Step 5)
 ]
 
 [project.scripts]

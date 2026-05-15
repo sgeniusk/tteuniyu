@@ -219,6 +219,24 @@ def cli() -> None:
         help="공통 카테고리 (예 economy, politics) — ad_allowed 정책 검증용",
     )
 
+    # summarize (T-006 Step 5) — Gemini 요약 dry-run + audit log
+    sub_sum = sub.add_parser(
+        "summarize",
+        help="cluster 제목 list → why_trending + coverage_summary (LLM_BACKEND=stub|gemini)",
+    )
+    sub_sum.add_argument("--headlines", nargs="+", required=True, help="cluster 헤드라인")
+    sub_sum.add_argument("--category", default=None, help="공통 카테고리")
+
+    # trust-signal (T-006 Step 5) — Trust Tag 평가 dry-run + audit log
+    sub_trust = sub.add_parser(
+        "trust-signal",
+        help="cluster 헤드라인 → hoax/clickbait/investment Trust Signal 평가",
+    )
+    sub_trust.add_argument("--headlines", nargs="+", required=True, help="cluster 헤드라인")
+    sub_trust.add_argument("--category", default=None, help="ad_allowed + human_review 정책")
+    sub_trust.add_argument("--sample-size", type=int, default=10, help="cluster 표본 수")
+    sub_trust.add_argument("--single-source", action="store_true", help="단일 매체만일 때")
+
     args = parser.parse_args()
     configure_logging()
 
@@ -250,6 +268,50 @@ def cli() -> None:
                 f"  cluster {r.cluster_id} — quality={r.sample_quality}, "
                 f"ad_allowed={r.ad_allowed}, members=[{members}]"
             )
+        sys.exit(0)
+
+    if args.command == "summarize":
+        from tteuniyu_worker.cost_monitor import CostMonitor
+        from tteuniyu_worker.summarize import get_summarizer
+
+        cost_monitor = CostMonitor()
+        summarizer = get_summarizer(cost_monitor=cost_monitor)
+        result = summarizer.summarize(args.headlines, category=args.category)
+        console.print(f"[green]✅ summarize ({result.audit.model})[/green]")
+        console.print(f"  WHY        — {result.why_trending}")
+        console.print(f"  COVERAGE   — {result.coverage_summary}")
+        console.print(
+            f"  audit      — copy_ratio={result.audit.copy_ratio:.3f}, "
+            f"blocked={result.audit.blocked_terms_result}, "
+            f"human_review={result.audit.human_review_required}, "
+            f"cost=${result.audit.cost_usd:.5f}"
+        )
+        sys.exit(0)
+
+    if args.command == "trust-signal":
+        from tteuniyu_worker.cost_monitor import CostMonitor
+        from tteuniyu_worker.trust_signal import get_trust_signaler
+
+        cost_monitor = CostMonitor()
+        signaler = get_trust_signaler(cost_monitor=cost_monitor)
+        result = signaler.evaluate(
+            args.headlines,
+            category=args.category,
+            sample_size=args.sample_size,
+            single_source=args.single_source,
+        )
+        console.print(f"[green]✅ trust-signal ({result.audit.model})[/green]")
+        console.print(
+            f"  hoax_likelihood={result.hoax_likelihood:.3f} / "
+            f"clickbait={result.clickbait_score:.3f} / "
+            f"is_investment={result.is_investment}"
+        )
+        console.print(f"  trust_tags    — {result.trust_tags}")
+        console.print(
+            f"  audit         — blocked={result.audit.blocked_terms_result}, "
+            f"human_review={result.audit.human_review_required}, "
+            f"cost=${result.audit.cost_usd:.5f}"
+        )
         sys.exit(0)
 
     parser.print_help()
