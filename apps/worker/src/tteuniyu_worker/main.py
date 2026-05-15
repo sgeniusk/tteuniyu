@@ -237,6 +237,13 @@ def cli() -> None:
     sub_trust.add_argument("--sample-size", type=int, default=10, help="cluster 표본 수")
     sub_trust.add_argument("--single-source", action="store_true", help="단일 매체만일 때")
 
+    # digest (ADR-017) — Daily Digest 발송 (mock subscribers + Resend or stub)
+    sub_dig = sub.add_parser(
+        "digest",
+        help="Daily Digest 발송 — mock subscribers (DIGEST_BACKEND=stub|resend)",
+    )
+    sub_dig.add_argument("--dry-run", action="store_true", help="실 발송 X (stub backend 강제)")
+
     args = parser.parse_args()
     configure_logging()
 
@@ -313,6 +320,35 @@ def cli() -> None:
             f"cost=${result.audit.cost_usd:.5f}"
         )
         sys.exit(0)
+
+    if args.command == "digest":
+        import os as _os
+
+        from tteuniyu_worker.digest import (
+            mock_payload,
+            mock_subscribers,
+            send_to_all_subscribers,
+        )
+
+        if args.dry_run:
+            _os.environ["DIGEST_BACKEND"] = "stub"
+
+        subscribers = mock_subscribers()
+        results = send_to_all_subscribers(subscribers, mock_payload)
+        ok = sum(1 for r in results if r.sent)
+        console.print(
+            f"[green]✅ digest — {ok}/{len(results)} subscribers (mock)[/green]"
+        )
+        for r in results:
+            status = "✅" if r.sent else "❌"
+            console.print(
+                f"  {status} {r.email} — clusters={r.cluster_count}, "
+                f"topic_matches={r.custom_topic_matches}, "
+                f"message_id={r.message_id or '-'}"
+            )
+            if r.error:
+                console.print(f"     [red]error: {r.error}[/red]")
+        sys.exit(0 if ok == len(results) else 1)
 
     parser.print_help()
     sys.exit(2)
