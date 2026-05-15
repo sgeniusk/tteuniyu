@@ -55,9 +55,10 @@ CREATE TABLE IF NOT EXISTS digest_send_log (
 CREATE INDEX IF NOT EXISTS idx_digest_log_user
   ON digest_send_log (user_id, sent_at DESC);
 
+-- Postgres는 partial index predicate에 IMMUTABLE만 허용. now()는 STABLE이라 X.
+-- 전체 sent_at index로 대체 — 자주 쿼리되는 최근 30일은 어차피 index head에 위치.
 CREATE INDEX IF NOT EXISTS idx_digest_log_recent
-  ON digest_send_log (sent_at DESC)
-  WHERE sent_at > now() - INTERVAL '30 days';
+  ON digest_send_log (sent_at DESC);
 
 -- ─── RLS — own data only (CLAUDE.md rule 11) ─────────────────────────
 

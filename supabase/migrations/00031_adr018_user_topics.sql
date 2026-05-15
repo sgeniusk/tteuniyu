@@ -51,9 +51,9 @@ CREATE TABLE IF NOT EXISTS user_topic_matches (
 CREATE INDEX IF NOT EXISTS idx_user_topic_matches_topic
   ON user_topic_matches (topic_id, matched_at DESC);
 
+-- Partial index predicate는 IMMUTABLE만 허용 (now() X). 전체 sent_at index로 대체.
 CREATE INDEX IF NOT EXISTS idx_user_topic_matches_recent
-  ON user_topic_matches (matched_at DESC)
-  WHERE matched_at > now() - INTERVAL '7 days';
+  ON user_topic_matches (matched_at DESC);
 
 -- ─── RLS — own data only (CLAUDE.md rule 11) ─────────────────────────
 
