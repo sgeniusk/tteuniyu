@@ -39,6 +39,7 @@ import {
 import { getClusterDetail } from '@/lib/mock/cluster-details'
 import { findOutlet } from '@/lib/mock/outlets'
 import { generateTrend } from '@/lib/mock/trend'
+import { fetchClusterDetailFromSupabase } from '@/lib/clusters/detail-from-supabase'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -65,65 +66,99 @@ export async function GET(
     )
   }
 
+  const now = new Date()
+  const updated_at = now.toISOString()
+
+  // ── Path 1: mock pool ───────────────────────────────────
   const seed = findSeedById(id)
   const detail = getClusterDetail(id)
-  if (!seed || !detail) {
+  if (seed && detail) {
+    const outlets: OutletReport[] = detail.outlet_reports
+      .map((r): OutletReport | null => {
+        const meta = findOutlet(r.outlet_slug)
+        if (!meta) return null
+        const published = new Date(now.getTime() - r.minutes_ago * 60_000).toISOString()
+        return {
+          outlet_slug: r.outlet_slug,
+          outlet_name: r.outlet_name,
+          stance: r.stance,
+          headline: r.headline,
+          published_at: published,
+          outlet_url: `${meta.base_url}${r.path}`,
+        }
+      })
+      .filter((r): r is OutletReport => r !== null)
+
+    if (outlets.length === 0) {
+      return NextResponse.json({ error: 'no_outlets' }, { status: 503 })
+    }
+
+    const trend = generateTrend(seed.cluster_id, now)
+    const ai_analysis: AiAnalysis = {
+      why_trending: detail.ai_analysis.why_trending,
+      coverage_summary: detail.ai_analysis.coverage_summary,
+      deep: { entity_card: detail.ai_analysis.entity_card, trend },
+    }
+    const payload = ClusterDetailResponseSchema.parse({
+      cluster_id: seed.cluster_id,
+      title: seed.title,
+      category: seed.category,
+      coverage: clusterCoverageAt(seed, now),
+      sample_quality: seed.sample_quality,
+      ai_analysis,
+      youtube_news: detail.youtube_news,
+      outlets,
+      methodology_version: METHODOLOGY_VERSION,
+      updated_at,
+    })
+    return NextResponse.json(payload, { headers: COMMON_HEADERS })
+  }
+
+  // ── Path 2: Supabase fallback ───────────────────────────
+  const live = await fetchClusterDetailFromSupabase(id)
+  if (!live || live.outlets.length === 0) {
     return NextResponse.json(
-      { error: 'not_found', message: 'cluster not in P0w mock pool' },
+      { error: 'not_found', message: 'cluster not in mock pool nor Supabase' },
       { status: 404 },
     )
   }
 
-  const now = new Date()
-  const updated_at = now.toISOString()
-
-  // Compose outlet reports (mock) — drop entries whose outlet_slug isn't
-  // in the registered pool so we never emit dangling references.
-  const outlets: OutletReport[] = detail.outlet_reports
-    .map((r): OutletReport | null => {
-      const meta = findOutlet(r.outlet_slug)
-      if (!meta) return null
-      const published = new Date(now.getTime() - r.minutes_ago * 60_000).toISOString()
-      return {
-        outlet_slug: r.outlet_slug,
-        outlet_name: r.outlet_name,
-        stance: r.stance,
-        headline: r.headline,
-        published_at: published,
-        outlet_url: `${meta.base_url}${r.path}`,
-      }
-    })
-    .filter((r): r is OutletReport => r !== null)
-
-  if (outlets.length === 0) {
-    return NextResponse.json({ error: 'no_outlets' }, { status: 503 })
-  }
-
-  // v1.6.5: trend is generated at request time in P0w; P0a will SELECT
-  // from `keyword_trends` (ADR-008) and set `cached: true`.
-  const trend = generateTrend(seed.cluster_id, now)
-
+  // PR #45 Gemini 요약 머지 전엔 summaries 비어있음 → placeholder ai_analysis.
+  // entity_card는 schema-required이므로 최소 형태로 채움 (실데이터는 PR #45에서).
+  const why_trending =
+    live.why_trending ??
+    `${live.outlets.length}개 매체에서 동시에 보도된 주제입니다.`
+  const coverage_summary =
+    live.coverage_summary ??
+    '본 클러스터의 종합 분석은 LLM 요약 워커가 활성화된 후 자동 갱신됩니다.'
   const ai_analysis: AiAnalysis = {
-    why_trending: detail.ai_analysis.why_trending,
-    coverage_summary: detail.ai_analysis.coverage_summary,
+    why_trending,
+    coverage_summary,
     deep: {
-      entity_card: detail.ai_analysis.entity_card,
-      trend,
+      entity_card: {
+        definition: live.title,
+        domain_facts: [
+          { label: '매체 수', value: `${live.outlets.length}개` },
+          { label: '클러스터 품질', value: live.sample_quality },
+        ],
+      },
+      // ADR-008 keyword_trends 워커 미가동 — 임시로 mock trend 재사용 (deterministic).
+      trend: generateTrend(live.cluster_id, now),
     },
   }
 
   const payload = ClusterDetailResponseSchema.parse({
-    cluster_id: seed.cluster_id,
-    title: seed.title,
-    category: seed.category,
-    coverage: clusterCoverageAt(seed, now),
-    sample_quality: seed.sample_quality,
+    cluster_id: live.cluster_id,
+    title: live.title,
+    category: live.category,
+    coverage: live.coverage,
+    sample_quality: live.sample_quality,
     ai_analysis,
-    youtube_news: detail.youtube_news,
-    outlets,
+    outlets: live.outlets,
     methodology_version: METHODOLOGY_VERSION,
     updated_at,
   })
-
-  return NextResponse.json(payload, { headers: COMMON_HEADERS })
+  return NextResponse.json(payload, {
+    headers: { ...COMMON_HEADERS, 'X-Cluster-Source': 'supabase' },
+  })
 }
