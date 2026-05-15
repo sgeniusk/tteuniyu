@@ -263,11 +263,18 @@ def cli() -> None:
         sys.exit(exit_code)
 
     if args.command == "ingest":
+        from tteuniyu_worker.db import upsert_sources
         from tteuniyu_worker.ingest import render_summary, run_ingest
         from tteuniyu_worker.sources import filter_active, load
 
         whitelist = load(args.whitelist)
         active = filter_active(whitelist)
+        # FK 제약 (`articles_source_slug_fkey`) 사전 만족용 — yaml → sources 테이블 동기화.
+        # 매번 마이그레이션 만드는 것보다 동적, yaml 변경 시 즉시 반영.
+        sources_result = asyncio.run(upsert_sources(active))
+        console.print(
+            f"[dim]sources upsert — {sources_result.get('upserted', 0)}/{len(active)} ({sources_result.get('mode')})[/dim]"
+        )
         stats = asyncio.run(run_ingest(active, args.max_concurrent))
         fail_count = render_summary(stats)
         # 운영 정책 — 일부 매체 실패는 정상 (URL drift 일상). 전 매체 실패만 catastrophic.

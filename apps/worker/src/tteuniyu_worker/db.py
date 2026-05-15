@@ -8,6 +8,7 @@ client는 lazy init — env vars 미설정 시 None 반환 (CI dry-run 호환).
 PR #23 — articles INSERT만.
 PR #24 — clusters / cluster_articles INSERT.
 PR #25 — summaries INSERT + audit_logs INSERT.
+PR #41 — sources upsert (ingest 진입 시 yaml → sources 테이블 동기화).
 """
 
 from __future__ import annotations
@@ -15,11 +16,14 @@ from __future__ import annotations
 import os
 from datetime import datetime
 from functools import lru_cache
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from pydantic import BaseModel, ConfigDict, HttpUrl
 from supabase import Client, create_client
+
+if TYPE_CHECKING:
+    from tteuniyu_worker.sources import Source
 
 logger = structlog.get_logger(__name__)
 
@@ -105,3 +109,49 @@ async def insert_articles(payloads: list[ArticleInsert]) -> dict[str, Any]:
     inserted = len(response.data) if response.data else 0
     logger.info("db.insert_articles.ok", attempted=len(payloads), inserted=inserted)
     return {"mode": "live", "attempted": len(payloads), "inserted": inserted}
+
+
+async def upsert_sources(sources: list[Source]) -> dict[str, Any]:
+    """sources 테이블 upsert — yaml → DB 동기화.
+
+    ingest 진입 시 호출하면 articles FK 제약 (`articles_source_slug_fkey`)
+    위반 사전 차단. yaml이 단일 진실, sources 테이블은 derived state.
+
+    별도 seed migration 대신 워커가 동적으로 동기화 — yaml 갱신 시 마이그레이션
+    추가 부담 X.
+
+    client 부재 시 noop (CI/dry-run 호환).
+    """
+
+    if not sources:
+        return {"mode": "noop", "attempted": 0, "upserted": 0}
+
+    client = get_client()
+    if client is None:
+        logger.info("db.upsert_sources.dry_run", count=len(sources))
+        return {"mode": "dry_run", "attempted": len(sources), "upserted": 0}
+
+    rows = [
+        {
+            "slug": s.slug,
+            "name": s.name,
+            "rss_url": str(s.rss_url),
+            "base_url": str(s.base_url),
+            "contact_email": s.contact_email,
+            "tos_confirmed": s.tos_confirmed,
+            "ingestion_enabled": s.ingestion_enabled,
+            "confirmed_at": s.confirmed_at.isoformat() if s.confirmed_at else None,
+            "notes": s.notes,
+        }
+        for s in sources
+    ]
+
+    try:
+        response = client.table("sources").upsert(rows, on_conflict="slug").execute()
+    except Exception as err:
+        logger.error("db.upsert_sources.failed", error=str(err), count=len(sources))
+        return {"mode": "live", "attempted": len(sources), "upserted": 0, "error": str(err)}
+
+    upserted = len(response.data) if response.data else 0
+    logger.info("db.upsert_sources.ok", attempted=len(sources), upserted=upserted)
+    return {"mode": "live", "attempted": len(sources), "upserted": upserted}
