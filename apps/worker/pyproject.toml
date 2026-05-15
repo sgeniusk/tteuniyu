@@ -16,6 +16,17 @@ dependencies = [
     "rich>=13.9",           # CLI table 출력 (dry-run)
     "supabase>=2.10",       # PR #23 — articles INSERT (service_role)
     "trafilatura>=1.12",    # PR #23 — HTML 본문 추출 (Korean 지원, RAM only)
+    "numpy>=2.0",           # T-006 Step 4 — embedding vector + agglomerative clustering
+]
+
+[project.optional-dependencies]
+# 실 운영 단계 — 무거운 ML deps. CI는 stub backend로 작동.
+# 사용 — uv sync --extra embedding --extra clustering
+embedding = [
+    "sentence-transformers>=3.0",  # paraphrase-multilingual-MiniLM-L12-v2
+]
+clustering = [
+    "scikit-learn>=1.5",  # HDBSCAN
 ]
 
 [project.scripts]
