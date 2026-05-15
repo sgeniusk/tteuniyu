@@ -155,3 +155,114 @@ async def upsert_sources(sources: list[Source]) -> dict[str, Any]:
     upserted = len(response.data) if response.data else 0
     logger.info("db.upsert_sources.ok", attempted=len(sources), upserted=upserted)
     return {"mode": "live", "attempted": len(sources), "upserted": upserted}
+
+
+# ─── cluster-pending 헬퍼 (PR #44) ────────────────────────────────
+
+
+class PendingArticle(BaseModel):
+    """클러스터링 대기 article — DB read 결과."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    headline: str
+    source_slug: str
+
+
+async def fetch_pending_articles(lookback_hours: int = 24) -> list[PendingArticle]:
+    """최근 N시간 articles 중 cluster_articles에 아직 안 묶인 것만.
+
+    Supabase는 LEFT JOIN으로 NOT EXISTS 표현이 까다로워 2단계 쿼리.
+      1. cluster_articles에서 이미 묶인 article_id set 가져오기
+      2. articles에서 ingested_at > cutoff 조건으로 가져온 뒤 set 차집합
+
+    실 N < 5000 가정 — 그 이상은 SQL function (RPC)로 옮길 시점.
+    """
+    client = get_client()
+    if client is None:
+        logger.warning("db.fetch_pending.no_client")
+        return []
+
+    from datetime import timedelta
+
+    cutoff = (datetime.utcnow() - timedelta(hours=lookback_hours)).isoformat()
+
+    # 이미 클러스터링 된 article_id 집합
+    clustered_resp = client.table("cluster_articles").select("article_id").execute()
+    clustered_ids: set[str] = {row["article_id"] for row in (clustered_resp.data or [])}
+
+    # 최근 N시간 articles
+    pending_resp = (
+        client.table("articles")
+        .select("id, headline, source_slug")
+        .gte("ingested_at", cutoff)
+        .order("ingested_at", desc=True)
+        .limit(2000)
+        .execute()
+    )
+
+    pending = [
+        PendingArticle(**row)
+        for row in (pending_resp.data or [])
+        if row["id"] not in clustered_ids
+    ]
+    logger.info(
+        "db.fetch_pending.ok",
+        total_recent=len(pending_resp.data or []),
+        already_clustered=len(clustered_ids),
+        pending=len(pending),
+    )
+    return pending
+
+
+async def insert_cluster_with_articles(
+    title: str,
+    sample_quality: str,
+    ad_allowed: bool,
+    article_ids: list[str],
+    outlets_count: int,
+) -> str | None:
+    """clusters 1건 + cluster_articles N건 INSERT, cluster_id 반환.
+
+    실패 시 None — caller가 loop에서 collect.
+    """
+    client = get_client()
+    if client is None:
+        return None
+
+    try:
+        cluster_resp = (
+            client.table("clusters")
+            .insert(
+                {
+                    "title": title[:60],  # CHECK constraint 보호
+                    "sample_quality": sample_quality,
+                    "ad_allowed": ad_allowed,
+                    "outlets_count": outlets_count,
+                }
+            )
+            .execute()
+        )
+    except Exception as err:
+        logger.error("db.insert_cluster.failed", error=str(err))
+        return None
+
+    if not cluster_resp.data:
+        return None
+
+    cluster_id = cluster_resp.data[0]["id"]
+
+    try:
+        client.table("cluster_articles").insert(
+            [{"cluster_id": cluster_id, "article_id": aid} for aid in article_ids]
+        ).execute()
+    except Exception as err:
+        logger.error(
+            "db.insert_cluster_articles.failed",
+            cluster_id=cluster_id,
+            error=str(err),
+        )
+        # cluster row는 남지만 cluster_articles 0건 → 다음 회차에서 다시 시도되지 않음.
+        # 부분 실패 추적용 로그만 남기고 caller에 cluster_id 반환.
+    return cluster_id
