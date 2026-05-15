@@ -15,8 +15,10 @@ CREATE TABLE IF NOT EXISTS digest_subscriptions (
   marketing_consent       BOOLEAN NOT NULL DEFAULT false,  -- 별도 동의 (선택)
   marketing_consent_at    TIMESTAMPTZ,
   -- 1-click 수신거부 (정통망법 §50)
+  -- Supabase는 pgcrypto를 'extensions' schema에 두므로 gen_random_uuid() 사용
+  -- (pg_catalog 내장, schema 의존성 X). 32-char hex = 128-bit entropy로 충분.
   unsubscribe_token       TEXT NOT NULL UNIQUE
-                            DEFAULT encode(gen_random_bytes(24), 'hex'),
+                            DEFAULT replace(gen_random_uuid()::text, '-', ''),
   unsubscribed_at         TIMESTAMPTZ,
   -- 발송 옵션
   preferred_categories    TEXT[] NOT NULL DEFAULT '{}',
