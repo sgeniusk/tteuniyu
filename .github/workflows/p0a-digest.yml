@@ -1,0 +1,74 @@
+name: p0a-digest
+
+# ADR-017 Daily Digest — 매일 09:00 KST 자동 발송.
+#
+# 정통망법 §50의2 — 야간(21:00-08:00 KST) 광고성 정보 발송 X.
+# 09:00 KST = 00:00 UTC → 안전 시간대.
+#
+# 가동 단계.
+#   PR D3a (현재) — workflow_dispatch + schedule, DIGEST_BACKEND=stub default.
+#   사용자 — RESEND_API_KEY secret + DIGEST_BACKEND=resend env 등록 후 실 발송.
+#
+# Secrets 등록.
+#   필수 — SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (구독자 query)
+#   선택 — RESEND_API_KEY, DIGEST_FROM_EMAIL, SLACK_WEBHOOK_URL
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: dry-run mode (실 발송 X)
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+  # 매일 09:00 KST = 00:00 UTC.
+  schedule:
+    - cron: '0 0 * * *'
+
+concurrency:
+  group: p0a-digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: latest
+          enable-cache: true
+          cache-dependency-glob: apps/worker/uv.lock
+
+      - name: Install Python 3.12
+        run: uv python install 3.12
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Run digest
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          DIGEST_FROM_EMAIL: ${{ vars.DIGEST_FROM_EMAIL }}
+          # default stub — RESEND_API_KEY 등록 + workflow_dispatch dry_run=false 시 실 발송
+          DIGEST_BACKEND: ${{ inputs.dry_run == 'false' && 'resend' || 'stub' }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          LOG_FORMAT: json
+          LOG_LEVEL: INFO
+        run: |
+          DRY_FLAG=""
+          if [ "${{ inputs.dry_run }}" != "false" ]; then
+            DRY_FLAG="--dry-run"
+          fi
+          uv run worker digest $DRY_FLAG
