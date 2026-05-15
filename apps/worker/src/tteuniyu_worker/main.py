@@ -255,6 +255,24 @@ def cli() -> None:
         help="Custom Topic ↔ 신규 cluster 매칭 (TOPIC_MATCHER_BACKEND=stub|supabase)",
     )
 
+    # cluster-pending (PR #44) — articles 테이블에서 미클러스터링 기사 → DB cluster INSERT
+    sub_cls_pending = sub.add_parser(
+        "cluster-pending",
+        help="articles → embed → cluster → clusters/cluster_articles INSERT (CLUSTERING_BACKEND, EMBEDDING_BACKEND env)",
+    )
+    sub_cls_pending.add_argument(
+        "--lookback-hours",
+        type=int,
+        default=24,
+        help="이전 N시간 articles만 대상 (default: 24)",
+    )
+    sub_cls_pending.add_argument(
+        "--min-cluster-size",
+        type=int,
+        default=1,
+        help="이 이상 article 묶인 cluster만 DB 적재 (default: 1 — 단독도 적재)",
+    )
+
     args = parser.parse_args()
     configure_logging()
 
@@ -379,6 +397,61 @@ def cli() -> None:
         console.print(
             f"  topics={stats['topics']} / clusters={stats['clusters']} / "
             f"matches={stats['matches']} / inserted={stats['inserted']}"
+        )
+        sys.exit(0)
+
+    if args.command == "cluster-pending":
+        from tteuniyu_worker.cluster import ClusterInput, cluster_articles
+        from tteuniyu_worker.db import (
+            fetch_pending_articles,
+            insert_cluster_with_articles,
+        )
+        from tteuniyu_worker.embed import get_embedder
+
+        pending = asyncio.run(fetch_pending_articles(args.lookback_hours))
+        if not pending:
+            console.print(
+                f"[yellow]⚠ pending articles 0건 — 최근 {args.lookback_hours}시간 신규 ingest "
+                "이력 없거나 이미 다 클러스터링됨.[/yellow]"
+            )
+            sys.exit(0)
+
+        console.print(
+            f"[dim]pending {len(pending)}건 — embedding + clustering 시작...[/dim]"
+        )
+        embedder = get_embedder()
+        titles = [a.headline for a in pending]
+        embeddings = embedder.encode(titles)
+        inputs = [
+            ClusterInput(title=a.headline, embedding=embeddings[i])
+            for i, a in enumerate(pending)
+        ]
+        results = cluster_articles(inputs)
+
+        inserted_clusters = 0
+        for r in results:
+            if len(r.article_indices) < args.min_cluster_size:
+                continue
+            member_articles = [pending[i] for i in r.article_indices]
+            # 단일 article cluster는 그 자체 헤드라인이 cluster 제목. 다중이면 첫 article 헤드라인
+            # (요약 단계 PR #45에서 LLM 기반 제목으로 교체 예정).
+            title = member_articles[0].headline
+            outlets = len({a.source_slug for a in member_articles})
+            cluster_id = asyncio.run(
+                insert_cluster_with_articles(
+                    title=title,
+                    sample_quality=r.sample_quality,
+                    ad_allowed=r.ad_allowed,
+                    article_ids=[a.id for a in member_articles],
+                    outlets_count=outlets,
+                )
+            )
+            if cluster_id:
+                inserted_clusters += 1
+
+        console.print(
+            f"[green]✅ cluster-pending — pending={len(pending)} → "
+            f"clusters_created={inserted_clusters} (size>={args.min_cluster_size})[/green]"
         )
         sys.exit(0)
 
