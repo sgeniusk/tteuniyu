@@ -9,14 +9,17 @@
 -- pgvector 의존성 — Supabase Pro 기본 지원. 미설치 환경에서는 Cluster Plan
 -- Setting → Extensions → pgvector enable 필요.
 
-CREATE EXTENSION IF NOT EXISTS vector;
+-- Supabase는 extensions를 'extensions' schema에 둠. search_path 의존성 회피 위해
+-- pgvector를 extensions schema에 명시 enable + 컬럼도 schema-qualified.
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
 
 CREATE TABLE IF NOT EXISTS user_topics (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   keyword         TEXT NOT NULL CHECK (length(keyword) BETWEEN 1 AND 40),
   -- ADR-014 paraphrase-multilingual-MiniLM-L12-v2 출력 차원
-  embedding       VECTOR(384),
+  -- Supabase schema-qualified 참조 (search_path 의존성 회피)
+  embedding       extensions.vector(384),
   active          BOOLEAN NOT NULL DEFAULT true,
   -- ADR-018 §2.3 — Pro 단순 / Creator 의미적 / Leader 학습
   matching_mode   TEXT NOT NULL DEFAULT 'exact'
