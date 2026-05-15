@@ -52,8 +52,24 @@ jobs:
       - name: Install Python 3.12
         run: uv python install 3.12
 
+      # cluster-pending만 sentence-transformers 필요 — 무거운 의존성이라 분기.
       - name: Sync dependencies
-        run: uv sync --frozen
+        run: |
+          COMMAND="${{ inputs.command || 'dry-run' }}"
+          if [ "$COMMAND" = "cluster-pending" ]; then
+            uv sync --frozen --extra embedding
+          else
+            uv sync --frozen
+          fi
+
+      # HuggingFace 모델 캐시 — paraphrase-multilingual-MiniLM-L12-v2 약 470MB.
+      # 첫 실행만 다운로드, 이후 cache hit으로 30초 내 부팅.
+      - name: Cache HuggingFace models
+        if: ${{ inputs.command == 'cluster-pending' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-paraphrase-multilingual-MiniLM-L12-v2-v1
 
       - name: Run command (${{ inputs.command || 'dry-run' }})
         env:
@@ -63,9 +79,10 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           LOG_FORMAT: json
           LOG_LEVEL: INFO
+          # cluster-pending에서 실 의미 학습 임베딩 활성화. 다른 command는 영향 X.
+          EMBEDDING_BACKEND: sentence_transformers
         # schedule trigger 시 inputs 없음 → dry-run fallback.
-        # subcommand별 인자가 다르므로 분기 (dry-run/ingest는 --whitelist,
-        # cluster-pending은 --lookback-hours만 받음).
+        # subcommand별 인자가 다르므로 분기.
         run: |
           COMMAND="${{ inputs.command || 'dry-run' }}"
           case "$COMMAND" in
