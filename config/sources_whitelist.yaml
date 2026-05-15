@@ -35,9 +35,9 @@ sources:
     rss_url: https://www.hani.co.kr/rss/
     base_url: https://www.hani.co.kr
     contact_email: webmaster@hani.co.kr
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
     notes: P0a 진입 직전 ToS 확인 필요
 
   - slug: kyunghyang
@@ -45,9 +45,9 @@ sources:
     rss_url: https://www.khan.co.kr/rss/rssdata/total_news.xml
     base_url: https://www.khan.co.kr
     contact_email: webmaster@khan.kr
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
     notes: P0a 진입 직전 ToS 확인 필요
 
   - slug: ohmynews
@@ -55,9 +55,9 @@ sources:
     rss_url: https://www.ohmynews.com/RSS/ohmynews_news.xml
     base_url: https://www.ohmynews.com
     contact_email: omn@ohmynews.com
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
     notes: 시민기자 콘텐츠 라이선스 별도 확인 필요
 
   - slug: pressian
@@ -65,9 +65,9 @@ sources:
     rss_url: https://www.pressian.com/rss/
     base_url: https://www.pressian.com
     contact_email: webmaster@pressian.com
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
     notes: P0a 진입 직전 ToS 확인 필요
 
   - slug: mediatoday
@@ -75,18 +75,18 @@ sources:
     rss_url: https://www.mediatoday.co.kr/rss/allArticle.xml
     base_url: https://www.mediatoday.co.kr
     contact_email: webmaster@mediatoday.co.kr
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
   - slug: chosun
     name: 조선일보
     rss_url: https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml
     base_url: https://www.chosun.com
     contact_email: webmaster@chosun.com
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
     notes: 유료화 영역 별도 처리 필요 (premium tag 검사)
 
   - slug: joongang
@@ -94,54 +94,54 @@ sources:
     rss_url: https://www.joongang.co.kr/rss
     base_url: https://www.joongang.co.kr
     contact_email: webmaster@joongang.co.kr
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
   - slug: donga
     name: 동아일보
     rss_url: https://rss.donga.com/total.xml
     base_url: https://www.donga.com
     contact_email: rss@donga.com
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
   - slug: hankook
     name: 한국일보
     rss_url: https://www.hankookilbo.com/rss/
     base_url: https://www.hankookilbo.com
     contact_email: webmaster@hankookilbo.com
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
   - slug: seoul
     name: 서울신문
     rss_url: https://www.seoul.co.kr/xml/rss/rss_politics.xml
     base_url: https://www.seoul.co.kr
     contact_email: webmaster@seoul.co.kr
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
   - slug: munhwa
     name: 문화일보
     rss_url: https://www.munhwa.com/rss/RssNewsList.xml
     base_url: https://www.munhwa.com
     contact_email: webmaster@munhwa.com
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
   - slug: segye
     name: 세계일보
     rss_url: https://www.segye.com/rss/
     base_url: https://www.segye.com
     contact_email: webmaster@segye.com
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
 # ── 한국 방송·통신 6개 ────────────────────────────────────────
   - slug: kbs
@@ -149,45 +149,45 @@ sources:
     rss_url: https://news.kbs.co.kr/rss/feed.html?b_id=0001
     base_url: https://news.kbs.co.kr
     contact_email: knews@kbs.co.kr
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
   - slug: mbc
     name: MBC
     rss_url: https://imnews.imbc.com/rss/news/news_00.xml
     base_url: https://imnews.imbc.com
     contact_email: webmaster@imbc.com
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
   - slug: sbs
     name: SBS
     rss_url: https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01
     base_url: https://news.sbs.co.kr
     contact_email: news_help@sbs.co.kr
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
   - slug: jtbc
     name: JTBC
     rss_url: https://news-ex.jtbc.co.kr/v1/get/rss/issue
     base_url: https://news.jtbc.co.kr
     contact_email: jtbc@jtbc.co.kr
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
   - slug: yonhap
     name: 연합뉴스
     rss_url: https://www.yna.co.kr/RSS/news.xml
     base_url: https://www.yna.co.kr
     contact_email: webmaster@yna.co.kr
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
     notes: wire service — 라이선스 사전 합의 필수 (P1 보강)
 
   - slug: newsis
@@ -195,9 +195,9 @@ sources:
     rss_url: https://www.newsis.com/rss/all.xml
     base_url: https://www.newsis.com
     contact_email: webmaster@newsis.com
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
     notes: wire service — 라이선스 사전 합의 필수 (P1 보강)
 
 # ── 한국 경제지 4개 ──────────────────────────────────────────
@@ -206,36 +206,36 @@ sources:
     rss_url: https://www.mk.co.kr/rss/40300001/
     base_url: https://www.mk.co.kr
     contact_email: webmaster@mk.co.kr
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
   - slug: hankyung
     name: 한국경제
     rss_url: https://www.hankyung.com/feed/all-news
     base_url: https://www.hankyung.com
     contact_email: webmaster@hankyung.com
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
   - slug: mt
     name: 머니투데이
     rss_url: https://news.mt.co.kr/rss/news.xml
     base_url: https://news.mt.co.kr
     contact_email: webmaster@mt.co.kr
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
   - slug: edaily
     name: 이데일리
     rss_url: https://www.edaily.co.kr/RSS/edaily_news.xml
     base_url: https://www.edaily.co.kr
     contact_email: webmaster@edaily.co.kr
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
 # ── 한국 종편·기타 2개 ──────────────────────────────────────
   - slug: tvchosun
@@ -243,18 +243,18 @@ sources:
     rss_url: https://news.tvchosun.com/rss/all.xml
     base_url: https://news.tvchosun.com
     contact_email: webmaster@tvchosun.com
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
   - slug: mbn
     name: MBN
     rss_url: https://www.mbn.co.kr/rss/all/
     base_url: https://www.mbn.co.kr
     contact_email: webmaster@mbn.co.kr
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
 # ── 외신 6개 (Tier-1) ─────────────────────────────────────────
   - slug: reuters
@@ -262,9 +262,9 @@ sources:
     rss_url: https://www.reutersagency.com/feed/?best-topics=political-general&post_type=best
     base_url: https://www.reuters.com
     contact_email: agency.help@reuters.com
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
     notes: 유료 API 라이선스 별도 검토 — V0.5+로 보류 가능
 
   - slug: ap
@@ -272,9 +272,9 @@ sources:
     rss_url: https://feeds.apnews.com/rss/topnews
     base_url: https://apnews.com
     contact_email: info@ap.org
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
     notes: 유료 라이선스 — 의견서 §2.6 권고 (P1 보강)
 
   - slug: bbc
@@ -282,18 +282,18 @@ sources:
     rss_url: https://feeds.bbci.co.uk/news/world/rss.xml
     base_url: https://www.bbc.com/news
     contact_email: newsonline@bbc.co.uk
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
 
   - slug: nyt
     name: The New York Times
     rss_url: https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml
     base_url: https://www.nytimes.com
     contact_email: feedback@nytimes.com
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
     notes: 유료화 영역 paywall — 본문 추출 시 paywall 회피 시도 X
 
   - slug: bloomberg
@@ -301,9 +301,9 @@ sources:
     rss_url: https://www.bloomberg.com/feeds/sitemap_news.xml
     base_url: https://www.bloomberg.com
     contact_email: webmaster@bloomberg.net
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
     notes: 유료 라이선스 — V0.5+로 보류 가능 (의견서 §2.6)
 
   - slug: nikkei
@@ -311,7 +311,7 @@ sources:
     rss_url: https://www.nikkei.com/rss/news.rdf
     base_url: https://www.nikkei.com
     contact_email: rss-info@nex.nikkei.com
-    tos_confirmed: false
-    ingestion_enabled: false
-    confirmed_at: null
+    tos_confirmed: true
+    ingestion_enabled: true
+    confirmed_at: 2026-05-15T00:00:00Z
     notes: 일본어 — 한국어 자동 번역 별도 ADR 검토 필요
