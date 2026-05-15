@@ -202,6 +202,23 @@ def cli() -> None:
         help="동시 ingest 개수 (default: 4, HTML fetch 포함)",
     )
 
+    # cluster (T-006 Step 4) — 임베딩 + 클러스터링 dry-run (DB 적재 X)
+    sub_cls = sub.add_parser(
+        "cluster",
+        help="article 제목 list → 임베딩 + 클러스터링 dry-run (RAM only, DB 적재 X)",
+    )
+    sub_cls.add_argument(
+        "--titles",
+        nargs="+",
+        required=True,
+        help="클러스터링 대상 제목 (공백 구분, 따옴표 사용 권장)",
+    )
+    sub_cls.add_argument(
+        "--category",
+        default=None,
+        help="공통 카테고리 (예 economy, politics) — ad_allowed 정책 검증용",
+    )
+
     args = parser.parse_args()
     configure_logging()
 
@@ -218,6 +235,22 @@ def cli() -> None:
         stats = asyncio.run(run_ingest(active, args.max_concurrent))
         fail_count = render_summary(stats)
         sys.exit(fail_count)
+
+    if args.command == "cluster":
+        from tteuniyu_worker.cluster import embed_and_cluster
+        from tteuniyu_worker.embed import get_embedder
+
+        embedder = get_embedder()
+        categories = [args.category] * len(args.titles) if args.category else None
+        results = embed_and_cluster(args.titles, categories, embedder)
+        console.print(f"[green]✅ {len(args.titles)} 제목 → {len(results)} 클러스터[/green]")
+        for r in results:
+            members = ", ".join(args.titles[i][:30] for i in r.article_indices)
+            console.print(
+                f"  cluster {r.cluster_id} — quality={r.sample_quality}, "
+                f"ad_allowed={r.ad_allowed}, members=[{members}]"
+            )
+        sys.exit(0)
 
     parser.print_help()
     sys.exit(2)

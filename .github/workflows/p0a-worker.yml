@@ -2,12 +2,13 @@ name: p0a-worker
 
 # T-006 P0a Foundation — RSS 워커 GHA cron.
 #
-# PR #22 (현재) — workflow_dispatch만 (manual trigger). cron은 주석 처리.
-# PR #23/#24 진입 후 cron 활성화.
+# PR #28+ T-006 Step 4 (embed + cluster) 머지로 cron 활성화 — 시간당 1회 dry-run.
+# 실 ingest는 사용자가 매체 ToS 활성화 + Supabase 셋업 후 workflow_dispatch로 전환.
+# Step 5 (LLM + Trust Signal) 합류 시 cron command를 ingest로 변경 권고.
 #
 # Secrets 등록 (repo Settings → Secrets and variables → Actions).
-#  필수 (PR #23+) — SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-#  필수 (PR #24+) — GEMINI_API_KEY
+#  필수 (실 ingest 시) — SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+#  필수 (Step 5 LLM 시) — GEMINI_API_KEY
 #  권장 — SLACK_WEBHOOK_URL (ADR-014 비용 cap alert)
 
 on:
@@ -20,9 +21,11 @@ on:
         type: choice
         options:
           - dry-run
-  # PR #23+ 진입 후 cron 활성화 (5분마다).
-  # schedule:
-  #   - cron: '*/5 * * * *'
+          - ingest
+  # T-006 Step 4 cron 활성화 — 매 시간 dry-run (안전 default, active source 0개라 무동작).
+  # 사용자 source 활성화 + secrets 셋업 후 schedule 변경.
+  schedule:
+    - cron: '0 * * * *'  # 매 시간 정각 (UTC)
 
 # 동일 워크플로우 동시 실행 방지 (cron 중복 방지)
 concurrency:
@@ -52,7 +55,7 @@ jobs:
       - name: Sync dependencies
         run: uv sync --frozen
 
-      - name: Run command (${{ inputs.command }})
+      - name: Run command (${{ inputs.command || 'dry-run' }})
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -60,6 +63,8 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           LOG_FORMAT: json
           LOG_LEVEL: INFO
+        # schedule trigger 시 inputs 없음 → dry-run fallback
         run: |
-          uv run worker ${{ inputs.command }} \
+          COMMAND="${{ inputs.command || 'dry-run' }}"
+          uv run worker "$COMMAND" \
             --whitelist ../../config/sources_whitelist.yaml
