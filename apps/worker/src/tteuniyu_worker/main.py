@@ -93,7 +93,11 @@ async def fetch_one(client: httpx.AsyncClient, source: Source) -> FetchResult:
 
 
 async def run_dry(whitelist_path: Path, max_concurrent: int = 6) -> int:
-    """active source만 RSS fetch dry-run. exit code = fail 개수."""
+    """active source만 RSS fetch dry-run.
+
+    exit code 정책 — dry-run은 *진단 도구*이므로 항상 0 반환.
+    RSS URL drift (404/410/feedparser bozo)는 운영 일상이며 CI를 깨선 안 됨.
+    실패 매체 목록은 stdout 표 + structured log (`dry_run.complete`)로 노출."""
 
     whitelist = load(whitelist_path)
     active = filter_active(whitelist)
@@ -157,7 +161,8 @@ async def run_dry(whitelist_path: Path, max_concurrent: int = 6) -> int:
         fail=fail_count,
     )
 
-    return fail_count
+    # 진단 도구 — fail 개수와 무관하게 0. 실패 매체 정보는 stdout/log 참조.
+    return 0
 
 
 def cli() -> None:
@@ -265,7 +270,10 @@ def cli() -> None:
         active = filter_active(whitelist)
         stats = asyncio.run(run_ingest(active, args.max_concurrent))
         fail_count = render_summary(stats)
-        sys.exit(fail_count)
+        # 운영 정책 — 일부 매체 실패는 정상 (URL drift 일상). 전 매체 실패만 catastrophic.
+        # success == 0이면 outage 신호로 exit 1, 그 외엔 0.
+        success_count = len(stats) - fail_count
+        sys.exit(0 if success_count > 0 else 1)
 
     if args.command == "cluster":
         from tteuniyu_worker.cluster import embed_and_cluster
