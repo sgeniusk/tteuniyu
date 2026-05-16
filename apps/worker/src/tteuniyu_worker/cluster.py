@@ -118,13 +118,29 @@ class HDBSCANClusterer:
         return clusterer.fit_predict(embeddings)
 
 
+# 헤드라인은 짧고 표현 다양 — cosine 0.7은 같은 사건도 못 묶을 만큼 빡셈.
+# 0.55가 실측 균형점 (같은 사건 묶임 + 다른 사건 섞임 최소). CLUSTERING_THRESHOLD env로 override.
+DEFAULT_CLUSTERING_THRESHOLD = 0.55
+
+
+def get_clustering_threshold() -> float:
+    raw = os.getenv("CLUSTERING_THRESHOLD")
+    if raw:
+        try:
+            return float(raw)
+        except ValueError:
+            logger.warning("cluster.threshold.invalid", raw=raw)
+    return DEFAULT_CLUSTERING_THRESHOLD
+
+
 def get_clusterer() -> AgglomerativeClusterer | HDBSCANClusterer:
     backend = os.getenv("CLUSTERING_BACKEND", "agglomerative").lower()
     if backend == "hdbscan":
         logger.info("cluster.backend", choice="hdbscan")
         return HDBSCANClusterer(min_cluster_size=2)
-    logger.info("cluster.backend", choice="agglomerative", threshold=0.7)
-    return AgglomerativeClusterer(threshold=0.7)
+    threshold = get_clustering_threshold()
+    logger.info("cluster.backend", choice="agglomerative", threshold=threshold)
+    return AgglomerativeClusterer(threshold=threshold)
 
 
 def derive_sample_quality(size: int) -> str:

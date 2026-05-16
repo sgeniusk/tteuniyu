@@ -345,6 +345,137 @@ async def fetch_clusters_without_summary(limit: int = 50) -> list[ClusterForSumm
     return pending
 
 
+# ─── incremental merge 헬퍼 (PR — cluster 품질 개선) ──────────────
+
+
+class ExistingCluster(BaseModel):
+    """merge 후보 — 최근 생성된 cluster + 소속 헤드라인 (centroid 계산용)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    cluster_id: str
+    headlines: list[str]
+    source_slugs: list[str]
+
+
+async def fetch_existing_clusters_with_headlines(
+    lookback_hours: int = 24,
+) -> list[ExistingCluster]:
+    """최근 N시간 내 갱신된 cluster + 소속 article 헤드라인·매체.
+
+    incremental merge — 새 article을 이 cluster들의 centroid와 비교해 합칠지 결정.
+    오래된 cluster는 제외 (이슈 수명 — 24시간 지나면 새 cluster로).
+    """
+    client = get_client()
+    if client is None:
+        return []
+
+    from datetime import timedelta
+
+    cutoff = (datetime.utcnow() - timedelta(hours=lookback_hours)).isoformat()
+
+    clusters_resp = (
+        client.table("clusters")
+        .select("id")
+        .gte("updated_at", cutoff)
+        .limit(500)
+        .execute()
+    )
+
+    existing: list[ExistingCluster] = []
+    for row in clusters_resp.data or []:
+        ca_resp = (
+            client.table("cluster_articles")
+            .select("article:articles!inner(headline, source_slug)")
+            .eq("cluster_id", row["id"])
+            .execute()
+        )
+        headlines: list[str] = []
+        sources: list[str] = []
+        for ca in ca_resp.data or []:
+            art = ca.get("article")
+            art = art[0] if isinstance(art, list) else art
+            if art and art.get("headline"):
+                headlines.append(art["headline"])
+                sources.append(art.get("source_slug", ""))
+        if headlines:
+            existing.append(
+                ExistingCluster(
+                    cluster_id=row["id"], headlines=headlines, source_slugs=sources
+                )
+            )
+
+    logger.info("db.fetch_existing_clusters.ok", count=len(existing))
+    return existing
+
+
+async def add_article_to_cluster(cluster_id: str, article_id: str) -> bool:
+    """기존 cluster에 article merge — cluster_articles INSERT.
+
+    UNIQUE (cluster_id, article_id) — 중복 시 supabase가 거부, caller가 무시.
+    """
+    client = get_client()
+    if client is None:
+        return False
+    try:
+        client.table("cluster_articles").insert(
+            {"cluster_id": cluster_id, "article_id": article_id}
+        ).execute()
+    except Exception as err:
+        logger.warning(
+            "db.add_article_to_cluster.skip", cluster_id=cluster_id, error=str(err)
+        )
+        return False
+    return True
+
+
+async def refresh_cluster_outlets(cluster_id: str) -> None:
+    """cluster의 outlets_count + sample_quality + updated_at 재계산.
+
+    merge로 article이 추가됐을 때 호출 — unique source 수 재집계.
+    """
+    client = get_client()
+    if client is None:
+        return
+
+    ca_resp = (
+        client.table("cluster_articles")
+        .select("article:articles!inner(source_slug)")
+        .eq("cluster_id", cluster_id)
+        .execute()
+    )
+    sources: set[str] = set()
+    member_count = 0
+    for ca in ca_resp.data or []:
+        art = ca.get("article")
+        art = art[0] if isinstance(art, list) else art
+        if art and art.get("source_slug"):
+            sources.add(art["source_slug"])
+            member_count += 1
+
+    # ADR-005 sample_quality — cluster.py derive_sample_quality와 동일 기준.
+    quality = (
+        "insufficient_sample"
+        if member_count < 5
+        else "low_confidence"
+        if member_count < 10
+        else "sufficient"
+    )
+
+    try:
+        client.table("clusters").update(
+            {
+                "outlets_count": len(sources),
+                "sample_quality": quality,
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+        ).eq("id", cluster_id).execute()
+    except Exception as err:
+        logger.error(
+            "db.refresh_cluster_outlets.failed", cluster_id=cluster_id, error=str(err)
+        )
+
+
 async def insert_summary(
     cluster_id: str,
     why_trending: str,
