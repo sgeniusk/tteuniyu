@@ -115,7 +115,7 @@ export async function fetchClusterDetailFromSupabase(
     .from('summaries')
     .select('why_trending, coverage_summary')
     .eq('cluster_id', clusterId)
-    .order('created_at', { ascending: false })
+    .order('generated_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 

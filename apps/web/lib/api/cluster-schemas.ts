@@ -127,7 +127,10 @@ export type AiAnalysis = z.infer<typeof AiAnalysisSchema>
 export const ClusterDetailResponseSchema = z.object({
   cluster_id: z.string().uuid(),
   title: z.string().min(1).max(60),
-  category: CategorySchema,
+  // category는 optional — cluster-pending 워커가 만든 cluster는 LLM 카테고리
+  // 분류 전이라 NULL. widget의 WidgetClusterSchema도 category.optional()이라
+  // 두 schema 일관성 유지. UI는 category 미존재 시 Coverage Bar 등 숨김.
+  category: CategorySchema.optional(),
   coverage: CoverageCountsSchema,
   sample_quality: SampleQualitySchema,
   ai_analysis: AiAnalysisSchema,
