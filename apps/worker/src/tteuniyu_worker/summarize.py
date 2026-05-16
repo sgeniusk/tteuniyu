@@ -24,7 +24,8 @@ from tteuniyu_worker.llm_validator import VALIDATOR_VERSION, validate_llm_output
 logger = structlog.get_logger(__name__)
 
 PROMPT_VERSION_SUMMARIZE = "summarize_v1"
-GEMINI_MODEL_NAME = "gemini-2.0-flash"
+# gemini-2.0-flash는 2026년 신규 사용자 단종 (404). 2.5-flash로 이전.
+GEMINI_MODEL_NAME = "gemini-2.5-flash"
 
 
 @dataclass(frozen=True)

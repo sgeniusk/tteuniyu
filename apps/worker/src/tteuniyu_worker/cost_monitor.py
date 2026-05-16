@@ -21,11 +21,12 @@ logger = structlog.get_logger(__name__)
 DEFAULT_MONTHLY_CAP_USD = 50.0
 
 
-# Gemini 2.0 Flash 가격 (2026-05 기준 추정).
-# Input — $0.0001 / 1K tokens
-# Output — $0.0004 / 1K tokens
-GEMINI_FLASH_INPUT_USD_PER_1K = 0.0001
-GEMINI_FLASH_OUTPUT_USD_PER_1K = 0.0004
+# Gemini 2.5 Flash 가격 (2026-05 기준 추정, 보수적).
+# Input — $0.30 / 1M tokens = $0.0003 / 1K
+# Output — $2.50 / 1M tokens = $0.0025 / 1K
+# 2.0 Flash 단종으로 2.5로 이전 — 비용 cap 보호 정확도 위해 상수 갱신.
+GEMINI_FLASH_INPUT_USD_PER_1K = 0.0003
+GEMINI_FLASH_OUTPUT_USD_PER_1K = 0.0025
 
 
 class CostCapExceeded(RuntimeError):
@@ -65,7 +66,7 @@ class CostMonitor:
             self._current_total_usd = 0.0
             self._alert_sent = False
 
-    def add(self, cost_usd: float, source: str = "gemini-2.0-flash") -> None:
+    def add(self, cost_usd: float, source: str = "gemini-2.5-flash") -> None:
         """비용 추가 + cap 검사.
 
         cap 80% 도달 시 Slack alert (1회만).
@@ -127,7 +128,7 @@ class CostMonitor:
 
 
 def estimate_gemini_cost(input_tokens: int, output_tokens: int) -> float:
-    """Gemini 2.0 Flash 토큰당 비용 추정."""
+    """Gemini 2.5 Flash 토큰당 비용 추정."""
     input_cost = (input_tokens / 1000) * GEMINI_FLASH_INPUT_USD_PER_1K
     output_cost = (output_tokens / 1000) * GEMINI_FLASH_OUTPUT_USD_PER_1K
     return input_cost + output_cost
