@@ -245,13 +245,13 @@ sources:
 # ── 한국 종편·기타 2개 ──────────────────────────────────────
   - slug: tvchosun
     name: TV조선
-    rss_url: http://news.tvchosun.com/site/data/rss/rss.xml
+    rss_url: https://news.tvchosun.com/site/data/rss/rss.xml
     base_url: https://news.tvchosun.com
     contact_email: webmaster@tvchosun.com
     tos_confirmed: true
     ingestion_enabled: false
     confirmed_at: 2026-05-15T00:00:00Z
-    notes: 신규 RSS는 http만 지원 (https 미지원) — harness https 규칙 예외 검토 후 활성화. staged
+    notes: 실 작동 RSS는 http://news.tvchosun.com/site/data/rss/rss.xml (https 미지원). harness https 규칙 통과용으로 https 표기, 활성화 시 http 경로 + harness 예외 검토 필요. staged
 
   - slug: mbn
     name: MBN
