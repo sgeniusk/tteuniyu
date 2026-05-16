@@ -120,7 +120,7 @@ export default async function ClusterPage({ params }: ClusterPageProps) {
 
         <header className="flex flex-col gap-3">
           <p className="text-body-sm uppercase tracking-wide text-slate-400">
-            {CATEGORY_LABEL[cluster.category]} · 뜬이유 · Issue Risk OS
+            {(cluster.category ? CATEGORY_LABEL[cluster.category] : '이슈')} · 뜬이유 · Issue Risk OS
           </p>
           <h1 className="text-display-md font-pretendard">{cluster.title}</h1>
           <div className="flex flex-wrap items-center gap-3 text-body-sm text-slate-400">
