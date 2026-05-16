@@ -413,12 +413,21 @@ def cli() -> None:
         sys.exit(0)
 
     if args.command == "cluster-pending":
-        from tteuniyu_worker.cluster import ClusterInput, cluster_articles
+        import numpy as np
+
+        from tteuniyu_worker.cluster import (
+            ClusterInput,
+            cluster_articles,
+            get_clustering_threshold,
+        )
         from tteuniyu_worker.db import (
+            add_article_to_cluster,
+            fetch_existing_clusters_with_headlines,
             fetch_pending_articles,
             insert_cluster_with_articles,
+            refresh_cluster_outlets,
         )
-        from tteuniyu_worker.embed import get_embedder
+        from tteuniyu_worker.embed import cosine_similarity, get_embedder
 
         pending = asyncio.run(fetch_pending_articles(args.lookback_hours))
         if not pending:
@@ -429,41 +438,79 @@ def cli() -> None:
             sys.exit(0)
 
         console.print(
-            f"[dim]pending {len(pending)}건 — embedding + clustering 시작...[/dim]"
+            f"[dim]pending {len(pending)}건 — incremental merge + clustering...[/dim]"
         )
         embedder = get_embedder()
-        titles = [a.headline for a in pending]
-        embeddings = embedder.encode(titles)
-        inputs = [
-            ClusterInput(title=a.headline, embedding=embeddings[i])
-            for i, a in enumerate(pending)
-        ]
-        results = cluster_articles(inputs)
+        threshold = get_clustering_threshold()
 
-        inserted_clusters = 0
-        for r in results:
-            if len(r.article_indices) < args.min_cluster_size:
-                continue
-            member_articles = [pending[i] for i in r.article_indices]
-            # 단일 article cluster는 그 자체 헤드라인이 cluster 제목. 다중이면 첫 article 헤드라인
-            # (요약 단계 PR #45에서 LLM 기반 제목으로 교체 예정).
-            title = member_articles[0].headline
-            outlets = len({a.source_slug for a in member_articles})
-            cluster_id = asyncio.run(
-                insert_cluster_with_articles(
-                    title=title,
-                    sample_quality=r.sample_quality,
-                    ad_allowed=r.ad_allowed,
-                    article_ids=[a.id for a in member_articles],
-                    outlets_count=outlets,
+        # ── 1) 기존 cluster centroid 계산 ──────────────────
+        existing = asyncio.run(
+            fetch_existing_clusters_with_headlines(args.lookback_hours)
+        )
+        existing_centroids: list[np.ndarray] = []
+        for ec in existing:
+            emb = embedder.encode(ec.headlines)
+            centroid = emb.mean(axis=0)
+            norm = float(np.linalg.norm(centroid))
+            if norm > 0:
+                centroid = centroid / norm
+            existing_centroids.append(centroid)
+
+        # ── 2) 새 article 임베딩 ───────────────────────────
+        pending_emb = embedder.encode([a.headline for a in pending])
+
+        # ── 3) 각 새 article — 가장 가까운 기존 cluster에 merge 시도 ──
+        merged = 0
+        touched_clusters: set[str] = set()
+        unmerged_idx: list[int] = []
+        for i in range(len(pending)):
+            best_sim, best_j = 0.0, -1
+            for j, centroid in enumerate(existing_centroids):
+                sim = cosine_similarity(pending_emb[i], centroid)
+                if sim > best_sim:
+                    best_sim, best_j = sim, j
+            if best_j >= 0 and best_sim >= threshold:
+                ec = existing[best_j]
+                if asyncio.run(add_article_to_cluster(ec.cluster_id, pending[i].id)):
+                    merged += 1
+                    touched_clusters.add(ec.cluster_id)
+            else:
+                unmerged_idx.append(i)
+
+        # merge된 cluster들 outlets_count/sample_quality 재계산
+        for cid in touched_clusters:
+            asyncio.run(refresh_cluster_outlets(cid))
+
+        # ── 4) merge 안 된 article들끼리 새 cluster 형성 ────
+        new_clusters = 0
+        if unmerged_idx:
+            inputs = [
+                ClusterInput(title=pending[i].headline, embedding=pending_emb[i])
+                for i in unmerged_idx
+            ]
+            results = cluster_articles(inputs)
+            for r in results:
+                if len(r.article_indices) < args.min_cluster_size:
+                    continue
+                member = [pending[unmerged_idx[idx]] for idx in r.article_indices]
+                title = member[0].headline
+                outlets = len({a.source_slug for a in member})
+                cluster_id = asyncio.run(
+                    insert_cluster_with_articles(
+                        title=title,
+                        sample_quality=r.sample_quality,
+                        ad_allowed=r.ad_allowed,
+                        article_ids=[a.id for a in member],
+                        outlets_count=outlets,
+                    )
                 )
-            )
-            if cluster_id:
-                inserted_clusters += 1
+                if cluster_id:
+                    new_clusters += 1
 
         console.print(
             f"[green]✅ cluster-pending — pending={len(pending)} → "
-            f"clusters_created={inserted_clusters} (size>={args.min_cluster_size})[/green]"
+            f"merged_into_existing={merged}, new_clusters={new_clusters} "
+            f"(threshold={threshold})[/green]"
         )
         sys.exit(0)
 
