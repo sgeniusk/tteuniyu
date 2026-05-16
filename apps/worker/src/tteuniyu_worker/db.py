@@ -266,3 +266,112 @@ async def insert_cluster_with_articles(
         # cluster row는 남지만 cluster_articles 0건 → 다음 회차에서 다시 시도되지 않음.
         # 부분 실패 추적용 로그만 남기고 caller에 cluster_id 반환.
     return cluster_id
+
+
+# ─── summarize-pending 헬퍼 (PR #45) ─────────────────────────────
+
+
+class ClusterForSummary(BaseModel):
+    """요약 대기 cluster — id + 소속 article 헤드라인 list."""
+
+    model_config = ConfigDict(extra="allow")
+
+    cluster_id: str
+    title: str
+    headlines: list[str]
+
+
+async def fetch_clusters_without_summary(limit: int = 50) -> list[ClusterForSummary]:
+    """summaries 테이블에 아직 행이 없는 cluster + 소속 article 헤드라인.
+
+    2-step 쿼리.
+      1. summaries에서 이미 요약된 cluster_id set
+      2. clusters 중 미요약 것 → 각 cluster_articles JOIN articles로 헤드라인 수집
+
+    LLM 비용 절약 — 단일 article cluster (outlets_count=1, headline 1개)도
+    요약 대상이나, multi-outlet 우선 처리 위해 outlets_count DESC 정렬.
+    """
+    client = get_client()
+    if client is None:
+        logger.warning("db.fetch_clusters_for_summary.no_client")
+        return []
+
+    summarized_resp = client.table("summaries").select("cluster_id").execute()
+    summarized_ids: set[str] = {
+        row["cluster_id"] for row in (summarized_resp.data or [])
+    }
+
+    clusters_resp = (
+        client.table("clusters")
+        .select("id, title, outlets_count")
+        .order("outlets_count", desc=True)
+        .order("updated_at", desc=True)
+        .limit(limit + len(summarized_ids))
+        .execute()
+    )
+
+    pending: list[ClusterForSummary] = []
+    for row in clusters_resp.data or []:
+        if row["id"] in summarized_ids:
+            continue
+        # 각 cluster의 article 헤드라인 수집
+        ca_resp = (
+            client.table("cluster_articles")
+            .select("article:articles!inner(headline)")
+            .eq("cluster_id", row["id"])
+            .execute()
+        )
+        headlines: list[str] = []
+        for ca in ca_resp.data or []:
+            art = ca.get("article")
+            art = art[0] if isinstance(art, list) else art
+            if art and art.get("headline"):
+                headlines.append(art["headline"])
+        if not headlines:
+            continue
+        pending.append(
+            ClusterForSummary(
+                cluster_id=row["id"], title=row["title"], headlines=headlines
+            )
+        )
+        if len(pending) >= limit:
+            break
+
+    logger.info(
+        "db.fetch_clusters_for_summary.ok",
+        already_summarized=len(summarized_ids),
+        pending=len(pending),
+    )
+    return pending
+
+
+async def insert_summary(
+    cluster_id: str,
+    why_trending: str,
+    coverage_summary: str,
+    audit_row: dict[str, Any],
+) -> bool:
+    """summaries 1건 INSERT — audit_row는 LLMCallAudit.as_db_row() 결과.
+
+    why_trending / coverage_summary는 schema CHECK (1-500 / 1-800)에 맞춰
+    caller가 truncate 후 전달.
+    """
+    client = get_client()
+    if client is None:
+        return False
+
+    row = {
+        **audit_row,
+        "cluster_id": cluster_id,
+        "why_trending": why_trending,
+        "coverage_summary": coverage_summary,
+    }
+
+    try:
+        client.table("summaries").insert(row).execute()
+    except Exception as err:
+        logger.error("db.insert_summary.failed", cluster_id=cluster_id, error=str(err))
+        return False
+
+    logger.info("db.insert_summary.ok", cluster_id=cluster_id)
+    return True

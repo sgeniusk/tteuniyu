@@ -1,0 +1,64 @@
+name: p0a-summarize
+
+# T-006 P0a Foundation — summarize-pending 자동 cron.
+#
+# ingest(정각) → cluster(30분) → summarize(45분) 순차 파이프라인의 마지막 단.
+# 15분 마진 — cluster-pending이 새 cluster를 만든 후 요약 시작.
+#
+# LLM 비용 — Gemini 2.0 Flash. cost_monitor가 월 $50 cap + 80% Slack alert.
+# Gemini 무료 한도 (1M tokens/일) 안에서 대부분 처리 — 비용 발생 가능성 낮음.
+#
+# Secrets — SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY (필수).
+#           SLACK_WEBHOOK_URL (권장 — 비용 cap alert).
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: '이번 회차 최대 요약 cluster 수'
+        required: false
+        default: '30'
+  schedule:
+    - cron: '45 * * * *'  # 매 시간 45분 (UTC)
+
+concurrency:
+  group: p0a-summarize
+  cancel-in-progress: false
+
+jobs:
+  summarize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: latest
+          enable-cache: true
+          cache-dependency-glob: apps/worker/uv.lock
+
+      - name: Install Python 3.12
+        run: uv python install 3.12
+
+      # summarize-pending 전용 — google-generativeai (Gemini SDK) 포함.
+      - name: Sync dependencies (with llm extra)
+        run: uv sync --frozen --extra llm
+
+      - name: Run summarize-pending
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          LOG_FORMAT: json
+          LOG_LEVEL: INFO
+          # 실 Gemini 요약 활성화. GEMINI_API_KEY 없으면 worker가 RuntimeError.
+          LLM_BACKEND: gemini
+        run: |
+          LIMIT="${{ inputs.limit || '30' }}"
+          uv run worker summarize-pending --limit "$LIMIT"

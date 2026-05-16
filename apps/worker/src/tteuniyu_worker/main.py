@@ -273,6 +273,18 @@ def cli() -> None:
         help="이 이상 article 묶인 cluster만 DB 적재 (default: 1 — 단독도 적재)",
     )
 
+    # summarize-pending (PR #45) — 미요약 cluster → Gemini 요약 → summaries INSERT
+    sub_sum_pending = sub.add_parser(
+        "summarize-pending",
+        help="summaries 없는 cluster → why_trending + coverage_summary 생성 (LLM_BACKEND env)",
+    )
+    sub_sum_pending.add_argument(
+        "--limit",
+        type=int,
+        default=30,
+        help="이번 회차 최대 요약 cluster 수 (default: 30, LLM 비용 cap 고려)",
+    )
+
     args = parser.parse_args()
     configure_logging()
 
@@ -452,6 +464,59 @@ def cli() -> None:
         console.print(
             f"[green]✅ cluster-pending — pending={len(pending)} → "
             f"clusters_created={inserted_clusters} (size>={args.min_cluster_size})[/green]"
+        )
+        sys.exit(0)
+
+    if args.command == "summarize-pending":
+        from tteuniyu_worker.cost_monitor import CostCapExceeded, CostMonitor
+        from tteuniyu_worker.db import fetch_clusters_without_summary, insert_summary
+        from tteuniyu_worker.summarize import get_summarizer
+
+        pending = asyncio.run(fetch_clusters_without_summary(args.limit))
+        if not pending:
+            console.print(
+                "[yellow]⚠ 요약 대기 cluster 0건 — 모든 cluster가 이미 요약됨.[/yellow]"
+            )
+            sys.exit(0)
+
+        console.print(
+            f"[dim]요약 대기 {len(pending)}건 — LLM 요약 시작...[/dim]"
+        )
+        cost_monitor = CostMonitor()
+        summarizer = get_summarizer(cost_monitor=cost_monitor)
+
+        summarized = 0
+        flagged = 0
+        for cluster in pending:
+            try:
+                result = summarizer.summarize(cluster.headlines)
+            except CostCapExceeded as err:
+                console.print(
+                    f"[red]⚠ 월 비용 cap 초과 — 요약 중단 ({summarized}건 완료). {err}[/red]"
+                )
+                break
+            # schema CHECK — why_trending 1-500, coverage_summary 1-800.
+            why = (result.why_trending or "요약 생성 실패").strip()[:500]
+            coverage = (result.coverage_summary or "요약 생성 실패").strip()[:800]
+            if result.audit.human_review_required:
+                flagged += 1
+            ok = asyncio.run(
+                insert_summary(
+                    cluster_id=cluster.cluster_id,
+                    why_trending=why,
+                    coverage_summary=coverage,
+                    audit_row=result.audit.as_db_row(),
+                )
+            )
+            if ok:
+                summarized += 1
+
+        console.print(
+            f"[green]✅ summarize-pending — pending={len(pending)} → "
+            f"summarized={summarized}, human_review_flagged={flagged}[/green]"
+        )
+        console.print(
+            f"[dim]이번 달 누적 비용 — ${cost_monitor.month_total_usd:.5f}[/dim]"
         )
         sys.exit(0)
 
