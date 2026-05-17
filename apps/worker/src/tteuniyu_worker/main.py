@@ -437,6 +437,13 @@ def cli() -> None:
                 f"[yellow]⚠ pending articles 0건 — 최근 {args.lookback_hours}시간 신규 ingest "
                 "이력 없거나 이미 다 클러스터링됨.[/yellow]"
             )
+            # pending이 없어도 velocity는 재계산 — 시간 경과로 기존 cluster의
+            # velocity가 줄어드는 것을 반영해야 함 (12h 윈도우 밖으로 빠지면 하락).
+            velocity_result = asyncio.run(update_cluster_velocity_scores())
+            console.print(
+                f"[dim]velocity — active_clusters={velocity_result.get('active_clusters', 0)}, "
+                f"rows_updated={velocity_result.get('updated', 0)}[/dim]"
+            )
             sys.exit(0)
 
         console.print(
