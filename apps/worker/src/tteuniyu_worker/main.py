@@ -427,6 +427,7 @@ def cli() -> None:
             insert_cluster_with_articles,
             invalidate_cluster_summary,
             refresh_cluster_outlets,
+            update_cluster_velocity_scores,
         )
         from tteuniyu_worker.embed import cosine_similarity, get_embedder
 
@@ -510,10 +511,17 @@ def cli() -> None:
                 if cluster_id:
                     new_clusters += 1
 
+        # ── 5) velocity_score 재계산 — widget 순위가 "지금 활동량" 반영 ──
+        velocity_result = asyncio.run(update_cluster_velocity_scores())
+
         console.print(
             f"[green]✅ cluster-pending — pending={len(pending)} → "
             f"merged_into_existing={merged}, new_clusters={new_clusters} "
             f"(threshold={threshold})[/green]"
+        )
+        console.print(
+            f"[dim]velocity — active_clusters={velocity_result.get('active_clusters', 0)}, "
+            f"rows_updated={velocity_result.get('updated', 0)}[/dim]"
         )
         sys.exit(0)
 
