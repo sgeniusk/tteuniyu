@@ -72,6 +72,9 @@ export async function fetchTopClustersFromSupabase(
       // rule 4 — 민감 컬럼 (hoax_likelihood, clickbait_score 등 raw score) 제외.
       'id, title, category, sample_quality, trust_tags, ad_allowed, outlets_count, coverage, updated_at',
     )
+    // velocity_score(최근 12h 활동량) 우선 — "지금 뜨는" 순위.
+    // 동률 시 outlets_count(누적 보도 매체 수), 그 다음 최신순.
+    .order('velocity_score', { ascending: false })
     .order('outlets_count', { ascending: false })
     .order('updated_at', { ascending: false })
     .limit(limit)

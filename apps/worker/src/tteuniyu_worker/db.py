@@ -476,6 +476,64 @@ async def refresh_cluster_outlets(cluster_id: str) -> None:
         )
 
 
+async def update_cluster_velocity_scores(window_hours: int = 12) -> dict[str, Any]:
+    """전체 cluster의 velocity_score 재계산 — 최근 N시간 내 추가된 기사 수.
+
+    velocity = cluster_articles.added_at이 now - window_hours 이내인 기사 수.
+    widget 순위가 "누적 크기"가 아닌 "지금 활동량"을 반영하도록 cluster-pending
+    회차마다 호출.
+
+    오래된 이슈는 신규 유입이 끊기면 velocity 0으로 떨어져 순위에서 자연 하락.
+    """
+    client = get_client()
+    if client is None:
+        return {"mode": "dry_run", "updated": 0}
+
+    from datetime import timedelta
+
+    cutoff = (datetime.utcnow() - timedelta(hours=window_hours)).isoformat()
+
+    # 최근 window 내 cluster_articles → cluster별 카운트
+    recent_resp = (
+        client.table("cluster_articles")
+        .select("cluster_id")
+        .gte("added_at", cutoff)
+        .execute()
+    )
+    velocity: dict[str, int] = {}
+    for row in recent_resp.data or []:
+        cid = row["cluster_id"]
+        velocity[cid] = velocity.get(cid, 0) + 1
+
+    # 전체 cluster id — velocity 맵에 없는 것은 0으로 재설정 (이전 값 잔존 방지)
+    all_resp = client.table("clusters").select("id, velocity_score").execute()
+
+    updated = 0
+    for row in all_resp.data or []:
+        cid = row["id"]
+        new_score = velocity.get(cid, 0)
+        # 값이 안 바뀐 cluster는 UPDATE 생략 — 불필요한 쓰기 회피
+        if new_score == row.get("velocity_score", 0):
+            continue
+        try:
+            client.table("clusters").update({"velocity_score": new_score}).eq(
+                "id", cid
+            ).execute()
+            updated += 1
+        except Exception as err:
+            logger.error(
+                "db.update_velocity.failed", cluster_id=cid, error=str(err)
+            )
+
+    logger.info(
+        "db.update_velocity.ok",
+        window_hours=window_hours,
+        active_clusters=len(velocity),
+        rows_updated=updated,
+    )
+    return {"mode": "live", "active_clusters": len(velocity), "updated": updated}
+
+
 async def invalidate_cluster_summary(cluster_id: str) -> bool:
     """cluster의 기존 summary 삭제 — merge로 기사가 추가되면 요약이 낡으므로.
 
