@@ -55,7 +55,7 @@ jobs:
       # cluster-pending만 sentence-transformers 필요 — 무거운 의존성이라 분기.
       - name: Sync dependencies
         run: |
-          COMMAND="${{ inputs.command || 'dry-run' }}"
+          COMMAND="${{ inputs.command || 'ingest' }}"
           if [ "$COMMAND" = "cluster-pending" ]; then
             uv sync --frozen --extra embedding
           else
@@ -71,7 +71,7 @@ jobs:
           path: ~/.cache/huggingface
           key: hf-paraphrase-multilingual-MiniLM-L12-v2-v1
 
-      - name: Run command (${{ inputs.command || 'dry-run' }})
+      - name: Run command (${{ inputs.command || 'ingest' }})
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -81,10 +81,11 @@ jobs:
           LOG_LEVEL: INFO
           # cluster-pending에서 실 의미 학습 임베딩 활성화. 다른 command는 영향 X.
           EMBEDDING_BACKEND: sentence_transformers
-        # schedule trigger 시 inputs 없음 → dry-run fallback.
+        # schedule trigger 시 inputs 없음 → ingest fallback (실 운영 — DB 적재).
+        # 셋업 완료 후 cron이 dry-run이 아닌 실 ingest를 돌도록 변경.
         # subcommand별 인자가 다르므로 분기.
         run: |
-          COMMAND="${{ inputs.command || 'dry-run' }}"
+          COMMAND="${{ inputs.command || 'ingest' }}"
           case "$COMMAND" in
             dry-run|ingest)
               uv run worker "$COMMAND" --whitelist ../../config/sources_whitelist.yaml
