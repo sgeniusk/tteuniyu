@@ -425,6 +425,7 @@ def cli() -> None:
             fetch_existing_clusters_with_headlines,
             fetch_pending_articles,
             insert_cluster_with_articles,
+            invalidate_cluster_summary,
             refresh_cluster_outlets,
         )
         from tteuniyu_worker.embed import cosine_similarity, get_embedder
@@ -477,9 +478,11 @@ def cli() -> None:
             else:
                 unmerged_idx.append(i)
 
-        # merge된 cluster들 outlets_count/sample_quality 재계산
+        # merge된 cluster들 — outlets_count 재계산 + 낡은 summary invalidate.
+        # summary 삭제 시 다음 summarize-pending cron이 자동 재요약.
         for cid in touched_clusters:
             asyncio.run(refresh_cluster_outlets(cid))
+            asyncio.run(invalidate_cluster_summary(cid))
 
         # ── 4) merge 안 된 article들끼리 새 cluster 형성 ────
         new_clusters = 0
