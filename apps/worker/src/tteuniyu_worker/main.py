@@ -469,12 +469,21 @@ def cli() -> None:
         pending_emb = embedder.encode([a.headline for a in pending])
 
         # ── 3) 각 새 article — 가장 가까운 기존 cluster에 merge 시도 ──
+        # 눈덩이 방지 — cluster가 MAX_CLUSTER_SIZE 이상이면 merge 후보 제외.
+        # 큰 cluster의 centroid는 일반화되어 무관 기사까지 흡수하므로 cap 필요.
+        MAX_CLUSTER_SIZE = 40
         merged = 0
         touched_clusters: set[str] = set()
         unmerged_idx: list[int] = []
+        # cluster별 현 크기 (fetch 시점 + 이번 회차 누적 merge 반영)
+        cluster_sizes: dict[str, int] = {
+            ec.cluster_id: len(ec.headlines) for ec in existing
+        }
         for i in range(len(pending)):
             best_sim, best_j = 0.0, -1
             for j, centroid in enumerate(existing_centroids):
+                if cluster_sizes.get(existing[j].cluster_id, 0) >= MAX_CLUSTER_SIZE:
+                    continue  # cap 초과 — 눈덩이 방지
                 sim = cosine_similarity(pending_emb[i], centroid)
                 if sim > best_sim:
                     best_sim, best_j = sim, j
@@ -483,6 +492,9 @@ def cli() -> None:
                 if asyncio.run(add_article_to_cluster(ec.cluster_id, pending[i].id)):
                     merged += 1
                     touched_clusters.add(ec.cluster_id)
+                    cluster_sizes[ec.cluster_id] = (
+                        cluster_sizes.get(ec.cluster_id, 0) + 1
+                    )
             else:
                 unmerged_idx.append(i)
 

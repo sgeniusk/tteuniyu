@@ -119,8 +119,9 @@ class HDBSCANClusterer:
 
 
 # 헤드라인은 짧고 표현 다양 — cosine 0.7은 같은 사건도 못 묶을 만큼 빡셈.
-# 0.55가 실측 균형점 (같은 사건 묶임 + 다른 사건 섞임 최소). CLUSTERING_THRESHOLD env로 override.
-DEFAULT_CLUSTERING_THRESHOLD = 0.55
+# 0.55는 너무 느슨해 큰 cluster가 정치 기사 전반을 흡수(눈덩이). 0.62로 상향 —
+# 같은 사건은 묶되 cluster 비대화 억제. CLUSTERING_THRESHOLD env로 override.
+DEFAULT_CLUSTERING_THRESHOLD = 0.62
 
 
 def get_clustering_threshold() -> float:
