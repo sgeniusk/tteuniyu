@@ -40,6 +40,7 @@ import { getClusterDetail } from '@/lib/mock/cluster-details'
 import { findOutlet } from '@/lib/mock/outlets'
 import { generateTrend } from '@/lib/mock/trend'
 import { fetchClusterDetailFromSupabase } from '@/lib/clusters/detail-from-supabase'
+import { buildSelfTrend } from '@/lib/clusters/trend'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -142,8 +143,11 @@ export async function GET(
           { label: '클러스터 품질', value: live.sample_quality },
         ],
       },
-      // ADR-008 keyword_trends 워커 미가동 — 임시로 mock trend 재사용 (deterministic).
-      trend: generateTrend(live.cluster_id, now),
+      // ADR-008 self source — cluster 소속 기사 published_at 자체 집계 (7일 추이).
+      trend: buildSelfTrend(
+        live.outlets.map((o) => o.published_at),
+        now,
+      ),
     },
   }
 
