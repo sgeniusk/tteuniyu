@@ -17,15 +17,21 @@ from dataclasses import dataclass
 
 import structlog
 
-from tteuniyu_worker.audit import LLMCallAudit, calculate_copy_ratio, hash_text
+from tteuniyu_worker.audit import (
+    LLMCallAudit,
+    calculate_copy_ratio,
+    extract_token_counts,
+    hash_text,
+)
 from tteuniyu_worker.cost_monitor import CostMonitor, estimate_gemini_cost
 from tteuniyu_worker.llm_validator import VALIDATOR_VERSION, validate_llm_output
 
 logger = structlog.get_logger(__name__)
 
 PROMPT_VERSION_SUMMARIZE = "summarize_v1"
-# gemini-2.0-flash는 2026년 신규 사용자 단종 (404). 2.5-flash로 이전.
-GEMINI_MODEL_NAME = "gemini-2.5-flash"
+# gemini-2.5-flash는 thinking(추론) 토큰을 대량 생성해 비용 폭증. 헤드라인
+# 요약엔 thinking 불필요 — flash-lite는 thinking 기본 꺼짐 + 단가도 저렴.
+GEMINI_MODEL_NAME = "gemini-2.5-flash-lite"
 
 
 @dataclass(frozen=True)
@@ -126,9 +132,10 @@ class GeminiSummarizer:
         response = self._client.generate_content(prompt)
         output_text = response.text or ""
 
-        # 토큰·비용 추정
-        input_tokens = len(prompt) // 3
-        output_tokens = len(output_text) // 3
+        # 실제 토큰 — API usage_metadata (thinking 토큰 포함, 글자수 추정 X).
+        input_tokens, output_tokens = extract_token_counts(
+            response, prompt, output_text
+        )
         cost = estimate_gemini_cost(input_tokens, output_tokens)
         if self.cost_monitor:
             self.cost_monitor.add(cost, source=GEMINI_MODEL_NAME)

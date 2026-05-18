@@ -80,3 +80,24 @@ def calculate_copy_ratio(source_text: str, output_text: str, ngram_size: int = 5
 
     total = len(out_words) - ngram_size + 1
     return matched / total if total > 0 else 0.0
+
+
+def extract_token_counts(
+    response: Any, fallback_input: str, fallback_output: str
+) -> tuple[int, int]:
+    """Gemini 응답에서 실제 토큰 수 추출 — (input_tokens, output_tokens).
+
+    API의 usage_metadata가 실제 과금 토큰. 글자수 기반 추정은 한국어에서 크게
+    어긋나고, 무엇보다 thinking 모델의 추론 토큰을 전혀 잡지 못한다.
+
+    output에 thoughts_token_count(추론 토큰)를 합산 — 실제 과금 대상.
+    usage_metadata 미제공 시에만 글자÷3 추정으로 fallback.
+    """
+    um = getattr(response, "usage_metadata", None)
+    if um is not None:
+        inp = int(getattr(um, "prompt_token_count", 0) or 0)
+        out = int(getattr(um, "candidates_token_count", 0) or 0)
+        out += int(getattr(um, "thoughts_token_count", 0) or 0)
+        if inp > 0:
+            return inp, out
+    return len(fallback_input) // 3, len(fallback_output) // 3
