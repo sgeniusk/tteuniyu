@@ -10,6 +10,8 @@
 
 import 'server-only'
 
+import type { SupabaseClient } from '@supabase/supabase-js'
+
 import { getServerClient } from '@/lib/supabase/server'
 import type { WidgetCluster } from '@/lib/api/widget-schemas'
 
@@ -25,6 +27,8 @@ interface SupabaseClusterRow {
   updated_at: string
 }
 
+type LatestArticle = { headline: string; published_at: string }
+
 const VALID_TRUST_TAGS = new Set(['hoax', 'clickbait', 'low_confidence', 'investment'])
 const VALID_CATEGORIES = new Set([
   'politics',
@@ -36,7 +40,7 @@ const VALID_CATEGORIES = new Set([
   'lifestyle',
 ])
 
-function mapRow(row: SupabaseClusterRow): WidgetCluster {
+function mapRow(row: SupabaseClusterRow, latest?: LatestArticle): WidgetCluster {
   const trustTags = (row.trust_tags ?? []).filter((t) => VALID_TRUST_TAGS.has(t)) as WidgetCluster['trust_tags']
   const category =
     row.category && VALID_CATEGORIES.has(row.category) ? (row.category as WidgetCluster['category']) : undefined
@@ -51,7 +55,51 @@ function mapRow(row: SupabaseClusterRow): WidgetCluster {
     previous_rank: null,
     trust_tags: trustTags,
     outlets_count: row.outlets_count ?? 0,
+    latest_article: latest
+      ? { headline: latest.headline.slice(0, 300), published_at: latest.published_at }
+      : undefined,
   }
+}
+
+/**
+ * 여러 cluster의 "최신 전개" — 각 cluster 소속 기사 중 가장 최근 발행 1건.
+ * cluster_articles + articles JOIN 단일 IN 쿼리 → cluster별 published_at 최댓값.
+ */
+async function fetchLatestArticleByCluster(
+  supabase: SupabaseClient,
+  clusterIds: string[],
+): Promise<Map<string, LatestArticle>> {
+  const map = new Map<string, LatestArticle>()
+  if (clusterIds.length === 0) return map
+
+  const { data, error } = await supabase
+    .from('cluster_articles')
+    .select('cluster_id, article:articles!inner(headline, published_at)')
+    .in('cluster_id', clusterIds)
+
+  if (error) {
+    console.error('[from-supabase] latest article fetch failed:', error.message)
+    return map
+  }
+
+  const nowIso = new Date().toISOString()
+  for (const row of data ?? []) {
+    const r = row as { cluster_id: string; article: unknown }
+    const art = (Array.isArray(r.article) ? r.article[0] : r.article) as
+      | { headline?: string; published_at?: string }
+      | null
+    if (!art?.headline || !art.published_at) continue
+    // 미래 시각(RSS 노이즈)은 "최신"으로 뽑히지 않도록 제외.
+    if (art.published_at > nowIso) continue
+    const prev = map.get(r.cluster_id)
+    if (!prev || art.published_at > prev.published_at) {
+      map.set(r.cluster_id, {
+        headline: art.headline,
+        published_at: art.published_at,
+      })
+    }
+  }
+  return map
 }
 
 /**
@@ -84,7 +132,13 @@ export async function fetchTopClustersFromSupabase(
     return []
   }
 
-  return (data ?? []).map((row) => mapRow(row as SupabaseClusterRow))
+  const rows = (data ?? []) as SupabaseClusterRow[]
+  // 각 cluster의 최신 전개 기사 1건 — 단일 IN 쿼리로 일괄 조회.
+  const latestMap = await fetchLatestArticleByCluster(
+    supabase,
+    rows.map((r) => r.id),
+  )
+  return rows.map((row) => mapRow(row, latestMap.get(row.id)))
 }
 
 /**
