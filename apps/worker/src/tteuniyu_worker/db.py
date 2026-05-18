@@ -506,45 +506,49 @@ async def delete_all_clusters() -> int:
 
 
 async def update_cluster_velocity_scores(window_hours: int = 12) -> dict[str, Any]:
-    """전체 cluster의 velocity_score 재계산 — 시간 가중 활동량.
+    """전체 cluster의 velocity_score 재계산 — 기사 발행 시각 기반 시간 가중.
 
-    단순 카운트는 cluster 크기 cap(40)에 막혀 활발한 cluster가 모두 동점이
-    되어 순위 변별이 사라진다. 그래서 added_at 시점에 따라 가중.
-      - 최근 3시간 이내 기사 — 3점
+    기준은 articles.published_at (기사가 실제 세상에 나온 시각). cluster_articles.
+    added_at은 우리 시스템이 처리한 시각이라 --rebuild 시 전부 리셋되어 시간
+    가중이 무의미하다. published_at은 rebuild와 무관하게 고정.
+
+    published_at 기준 가중.
+      - 최근 3시간 이내 발행 — 3점
       - 3~6시간 — 2점
       - 6~window_hours — 1점
+      - window_hours 초과 또는 미래 시각 — 0점 (제외)
 
-    같은 cap 40 cluster여도 방금 활발히 보도된 cluster는 점수가 높고, 한참
-    전에 컸던 cluster는 낮아져 — widget 순위가 실제로 움직인다.
-
-    오래된 이슈는 신규 유입이 끊기면 velocity 0으로 떨어져 자연 하락.
+    cap 40 cluster여도 방금 발행된 기사가 많은 cluster는 점수가 높고, 오래된
+    기사만 있는 cluster는 낮아져 widget 순위가 실제로 움직인다.
     """
     client = get_client()
     if client is None:
         return {"mode": "dry_run", "updated": 0}
 
-    from datetime import timedelta
-
     now = datetime.utcnow()
-    cutoff = (now - timedelta(hours=window_hours)).isoformat()
 
-    # 최근 window 내 cluster_articles → cluster별 시간가중 합산
+    # cluster_articles + articles.published_at JOIN — 전체 fetch 후 Python 필터.
     recent_resp = (
         client.table("cluster_articles")
-        .select("cluster_id, added_at")
-        .gte("added_at", cutoff)
+        .select("cluster_id, article:articles!inner(published_at)")
         .execute()
     )
     velocity: dict[str, int] = {}
     for row in recent_resp.data or []:
         cid = row["cluster_id"]
+        art = row.get("article")
+        art = art[0] if isinstance(art, list) else art
+        if not art or not art.get("published_at"):
+            continue
         try:
-            added = datetime.fromisoformat(
-                str(row["added_at"]).replace("Z", "+00:00")
+            pub = datetime.fromisoformat(
+                str(art["published_at"]).replace("Z", "+00:00")
             ).replace(tzinfo=None)
-            age_h = (now - added).total_seconds() / 3600
+            age_h = (now - pub).total_seconds() / 3600
         except (ValueError, TypeError):
-            age_h = window_hours  # 파싱 실패 — 최소 가중
+            continue
+        if age_h < 0 or age_h > window_hours:
+            continue  # 미래 시각(노이즈) 또는 window 밖
         weight = 3 if age_h < 3 else 2 if age_h < 6 else 1
         velocity[cid] = velocity.get(cid, 0) + weight
 
