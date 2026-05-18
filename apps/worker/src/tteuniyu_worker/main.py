@@ -432,7 +432,6 @@ def cli() -> None:
             fetch_existing_clusters_with_headlines,
             fetch_pending_articles,
             insert_cluster_with_articles,
-            invalidate_cluster_summary,
             refresh_cluster_outlets,
             update_cluster_velocity_scores,
         )
@@ -512,11 +511,12 @@ def cli() -> None:
             else:
                 unmerged_idx.append(i)
 
-        # merge된 cluster들 — outlets_count 재계산 + 낡은 summary invalidate.
-        # summary 삭제 시 다음 summarize-pending cron이 자동 재요약.
+        # merge된 cluster들 — outlets_count 재계산.
+        # summary 재요약(invalidate)은 하지 않음 — cluster당 1회 요약으로 충분.
+        # 새 기사의 신선도는 카드의 "최신 전개"(latest_article, LLM 0원)가
+        # 담당. 매 merge마다 재요약하면 같은 cluster가 반복 과금되어 비용 폭증.
         for cid in touched_clusters:
             asyncio.run(refresh_cluster_outlets(cid))
-            asyncio.run(invalidate_cluster_summary(cid))
 
         # ── 4) merge 안 된 article들끼리 새 cluster 형성 ────
         new_clusters = 0

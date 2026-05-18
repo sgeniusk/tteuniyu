@@ -581,27 +581,6 @@ async def update_cluster_velocity_scores(window_hours: int = 12) -> dict[str, An
     return {"mode": "live", "active_clusters": len(velocity), "updated": updated}
 
 
-async def invalidate_cluster_summary(cluster_id: str) -> bool:
-    """cluster의 기존 summary 삭제 — merge로 기사가 추가되면 요약이 낡으므로.
-
-    summaries 행을 삭제하면 다음 summarize-pending cron이 "요약 없는 cluster"로
-    인식해 자동 재요약. 삭제~재요약 사이 (~15분) /cluster/[id]는 placeholder 노출.
-    """
-    client = get_client()
-    if client is None:
-        return False
-    try:
-        client.table("summaries").delete().eq("cluster_id", cluster_id).execute()
-    except Exception as err:
-        logger.error(
-            "db.invalidate_cluster_summary.failed",
-            cluster_id=cluster_id,
-            error=str(err),
-        )
-        return False
-    return True
-
-
 async def insert_summary(
     cluster_id: str,
     why_trending: str,
