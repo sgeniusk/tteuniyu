@@ -35,6 +35,7 @@ from rich.table import Table
 
 from tteuniyu_worker.db import ArticleInsert, insert_articles
 from tteuniyu_worker.extract import extract_body
+from tteuniyu_worker.headline_filter import is_noise_headline
 from tteuniyu_worker.sources import Source
 
 logger = structlog.get_logger(__name__)
@@ -137,6 +138,10 @@ async def _ingest_one(
         title = entry.get("title")
         published_at = _parse_dt(entry.get("published") or entry.get("updated"))
         if not link or not title or not published_at:
+            continue
+
+        # 정시 뉴스·뉴스 묶음 헤드라인 제외 — 개별 이슈가 아니라 클러스터링 노이즈.
+        if is_noise_headline(title):
             continue
 
         # 본문 추출 (RAM only — rule 2). 결과는 통계만 기록 후 폐기.
