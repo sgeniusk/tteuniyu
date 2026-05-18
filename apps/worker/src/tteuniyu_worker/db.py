@@ -506,13 +506,18 @@ async def delete_all_clusters() -> int:
 
 
 async def update_cluster_velocity_scores(window_hours: int = 12) -> dict[str, Any]:
-    """전체 cluster의 velocity_score 재계산 — 최근 N시간 내 추가된 기사 수.
+    """전체 cluster의 velocity_score 재계산 — 시간 가중 활동량.
 
-    velocity = cluster_articles.added_at이 now - window_hours 이내인 기사 수.
-    widget 순위가 "누적 크기"가 아닌 "지금 활동량"을 반영하도록 cluster-pending
-    회차마다 호출.
+    단순 카운트는 cluster 크기 cap(40)에 막혀 활발한 cluster가 모두 동점이
+    되어 순위 변별이 사라진다. 그래서 added_at 시점에 따라 가중.
+      - 최근 3시간 이내 기사 — 3점
+      - 3~6시간 — 2점
+      - 6~window_hours — 1점
 
-    오래된 이슈는 신규 유입이 끊기면 velocity 0으로 떨어져 순위에서 자연 하락.
+    같은 cap 40 cluster여도 방금 활발히 보도된 cluster는 점수가 높고, 한참
+    전에 컸던 cluster는 낮아져 — widget 순위가 실제로 움직인다.
+
+    오래된 이슈는 신규 유입이 끊기면 velocity 0으로 떨어져 자연 하락.
     """
     client = get_client()
     if client is None:
@@ -520,19 +525,28 @@ async def update_cluster_velocity_scores(window_hours: int = 12) -> dict[str, An
 
     from datetime import timedelta
 
-    cutoff = (datetime.utcnow() - timedelta(hours=window_hours)).isoformat()
+    now = datetime.utcnow()
+    cutoff = (now - timedelta(hours=window_hours)).isoformat()
 
-    # 최근 window 내 cluster_articles → cluster별 카운트
+    # 최근 window 내 cluster_articles → cluster별 시간가중 합산
     recent_resp = (
         client.table("cluster_articles")
-        .select("cluster_id")
+        .select("cluster_id, added_at")
         .gte("added_at", cutoff)
         .execute()
     )
     velocity: dict[str, int] = {}
     for row in recent_resp.data or []:
         cid = row["cluster_id"]
-        velocity[cid] = velocity.get(cid, 0) + 1
+        try:
+            added = datetime.fromisoformat(
+                str(row["added_at"]).replace("Z", "+00:00")
+            ).replace(tzinfo=None)
+            age_h = (now - added).total_seconds() / 3600
+        except (ValueError, TypeError):
+            age_h = window_hours  # 파싱 실패 — 최소 가중
+        weight = 3 if age_h < 3 else 2 if age_h < 6 else 1
+        velocity[cid] = velocity.get(cid, 0) + weight
 
     # 전체 cluster id — velocity 맵에 없는 것은 0으로 재설정 (이전 값 잔존 방지)
     all_resp = client.table("clusters").select("id, velocity_score").execute()
