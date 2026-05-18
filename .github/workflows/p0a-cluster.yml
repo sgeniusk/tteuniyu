@@ -18,6 +18,10 @@ on:
         description: 'cluster-pending lookback (시간)'
         required: false
         default: '24'
+      rebuild:
+        description: '기존 cluster 전부 삭제 후 전체 재클러스터링 (알고리즘 변경 시)'
+        type: boolean
+        default: false
   schedule:
     - cron: '30 * * * *'  # 매 시간 30분 (UTC)
 
@@ -68,4 +72,6 @@ jobs:
           CLUSTERING_BACKEND: agglomerative
         run: |
           LOOKBACK="${{ inputs.lookback_hours || '24' }}"
-          uv run worker cluster-pending --lookback-hours "$LOOKBACK"
+          REBUILD=""
+          if [ "${{ inputs.rebuild }}" = "true" ]; then REBUILD="--rebuild"; fi
+          uv run worker cluster-pending --lookback-hours "$LOOKBACK" $REBUILD

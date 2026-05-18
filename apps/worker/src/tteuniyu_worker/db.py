@@ -476,6 +476,35 @@ async def refresh_cluster_outlets(cluster_id: str) -> None:
         )
 
 
+async def delete_all_clusters() -> int:
+    """clusters 전체 삭제 (cluster_articles·summaries CASCADE), 삭제 행 수 반환.
+
+    cluster-pending --rebuild 전용 — 클러스터링 알고리즘 변경 후 전체 재구성
+    시 호출. worker가 자기 derived 데이터(clusters)를 재생성하는 정상 운영
+    사이클의 일부이며, 1차 원본(articles)은 보존된다.
+
+    이후 fetch_pending_articles가 모든 article을 pending으로 인식 → 새 알고리즘
+    으로 전체 재클러스터링.
+    """
+    client = get_client()
+    if client is None:
+        return 0
+    try:
+        # supabase-py delete는 filter 필수 — 'id is not 더미UUID' 로 전체 매칭.
+        resp = (
+            client.table("clusters")
+            .delete()
+            .neq("id", "00000000-0000-0000-0000-000000000000")
+            .execute()
+        )
+    except Exception as err:
+        logger.error("db.delete_all_clusters.failed", error=str(err))
+        return 0
+    deleted = len(resp.data) if resp.data else 0
+    logger.info("db.delete_all_clusters.ok", deleted=deleted)
+    return deleted
+
+
 async def update_cluster_velocity_scores(window_hours: int = 12) -> dict[str, Any]:
     """전체 cluster의 velocity_score 재계산 — 최근 N시간 내 추가된 기사 수.
 
