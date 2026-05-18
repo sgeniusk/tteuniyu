@@ -110,6 +110,18 @@ const ClusterCore = z.object({
    * Optional + default 0으로 backward-compat 유지.
    */
   outlets_count: z.number().int().nonnegative().default(0),
+  /**
+   * 이슈의 "최신 전개" — cluster 소속 기사 중 가장 최근 발행 1건.
+   * 같은 이슈가 며칠 가도 카드가 "정체"로 보이지 않도록 — 카드에 방금 들어온
+   * 헤드라인을 노출해 "전개 중"임을 보여준다. Supabase 실데이터에만 존재,
+   * mock fallback cluster는 undefined.
+   */
+  latest_article: z
+    .object({
+      headline: z.string().min(1).max(300),
+      published_at: z.string(),
+    })
+    .optional(),
 })
 
 /** A single cluster card returned in any size. */

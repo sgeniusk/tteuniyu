@@ -123,7 +123,7 @@ export function ConceptCCard({ cluster, rank }: ConceptCCardProps) {
         )}
       </div>
 
-      {/* Content — title (2-line clamp) + bottom row */}
+      {/* Content — title + 최신 전개 + bottom row */}
       <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 px-2.5 py-1.5">
         <p
           className={cn(
@@ -133,6 +133,18 @@ export function ConceptCCard({ cluster, rank }: ConceptCCardProps) {
         >
           {cluster.title}
         </p>
+        {/* 최신 전개 — 이슈가 "정체"가 아닌 "전개 중"임을 보여줌.
+            대표 제목과 동일하면 중복이라 생략. */}
+        {cluster.latest_article &&
+          cluster.latest_article.headline !== cluster.title && (
+            <p className="line-clamp-1 break-keep text-[10px] leading-tight text-slate-400">
+              <span className="font-mono text-teal-400">
+                {relativeTime(cluster.latest_article.published_at)}
+              </span>
+              {' · '}
+              {cluster.latest_article.headline}
+            </p>
+          )}
         <div className="flex items-center gap-1.5 text-[10px]">
           <MediaDots count={outletsCount} />
           {trustTag ? (
