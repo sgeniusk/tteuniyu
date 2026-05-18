@@ -18,7 +18,7 @@ from typing import Iterable
 import numpy as np
 import structlog
 
-from tteuniyu_worker.embed import Embedder, cosine_similarity
+from tteuniyu_worker.embed import Embedder
 
 logger = structlog.get_logger(__name__)
 
@@ -60,14 +60,25 @@ class ClusterInput:
 
 
 class AgglomerativeClusterer:
-    """Pure numpy threshold-based agglomerative clustering.
+    """Pure numpy centroid-linkage clustering.
 
-    cosine similarity threshold (default 0.7) 이상이면 같은 클러스터.
-    O(N²) — N < 1000 적합. 대규모는 HDBSCAN 권장.
+    각 점을 가장 가까운 cluster centroid(평균)와 비교해 합류 — cosine
+    similarity가 threshold 이상이면 합류, 아니면 새 cluster.
+
+    이전 seed-based 1-pass 방식의 결함 — 첫 점이 "평범한" 임베딩이면 무관한
+    점까지 한 cluster로 흡수(거대 덩어리). centroid-linkage는 cluster 평균과
+    비교하므로 무관 점이 끼어도 centroid가 그 방향으로 흐르지 않아 안정적.
+
+    max_cluster_size — cluster가 이 크기에 도달하면 합류 후보에서 제외
+    (눈덩이 방지). 정원이 찬 cluster를 닮은 점은 새 cluster를 형성.
+
+    embeddings는 L2-normalized 가정 (embed.py 보장) — dot product = cosine.
+    O(N · K) — N 점, K cluster. N < 2000 적합.
     """
 
-    def __init__(self, threshold: float = 0.7) -> None:
+    def __init__(self, threshold: float = 0.62, max_cluster_size: int = 40) -> None:
         self.threshold = threshold
+        self.max_cluster_size = max_cluster_size
 
     def fit_predict(self, embeddings: np.ndarray) -> np.ndarray:
         n = len(embeddings)
@@ -75,20 +86,32 @@ class AgglomerativeClusterer:
             return np.array([], dtype=np.int32)
 
         labels = np.full(n, -1, dtype=np.int32)
-        next_label = 0
+        centroids: list[np.ndarray] = []
+        counts: list[int] = []
 
         for i in range(n):
-            if labels[i] != -1:
-                continue
-            labels[i] = next_label
-            for j in range(i + 1, n):
-                if labels[j] != -1:
-                    continue
-                if cosine_similarity(embeddings[i], embeddings[j]) >= self.threshold:
-                    labels[j] = next_label
-            next_label += 1
+            emb = embeddings[i]
+            best_c, best_sim = -1, self.threshold
+            for c in range(len(centroids)):
+                if counts[c] >= self.max_cluster_size:
+                    continue  # 정원 초과 — 눈덩이 방지
+                sim = float(np.dot(emb, centroids[c]))
+                if sim >= best_sim:
+                    best_sim, best_c = sim, c
 
-        return labels
+            if best_c >= 0:
+                labels[i] = best_c
+                k = counts[best_c]
+                merged = (centroids[best_c] * k + emb) / (k + 1)
+                norm = float(np.linalg.norm(merged))
+                centroids[best_c] = merged / norm if norm > 0 else merged
+                counts[best_c] = k + 1
+            else:
+                labels[i] = len(centroids)
+                centroids.append(emb.astype(np.float64).copy())
+                counts.append(1)
+
+        return labels.astype(np.int32)
 
 
 class HDBSCANClusterer:
