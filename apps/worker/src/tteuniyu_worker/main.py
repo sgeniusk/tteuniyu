@@ -272,6 +272,12 @@ def cli() -> None:
         default=1,
         help="이 이상 article 묶인 cluster만 DB 적재 (default: 1 — 단독도 적재)",
     )
+    sub_cls_pending.add_argument(
+        "--rebuild",
+        action="store_true",
+        help="기존 clusters 전부 삭제 후 전체 재클러스터링 (알고리즘 변경 시). "
+        "1차 원본 articles는 보존 — TRUNCATE SQL 대체",
+    )
 
     # summarize-pending (PR #45) — 미요약 cluster → Gemini 요약 → summaries INSERT
     sub_sum_pending = sub.add_parser(
@@ -422,6 +428,7 @@ def cli() -> None:
         )
         from tteuniyu_worker.db import (
             add_article_to_cluster,
+            delete_all_clusters,
             fetch_existing_clusters_with_headlines,
             fetch_pending_articles,
             insert_cluster_with_articles,
@@ -430,6 +437,13 @@ def cli() -> None:
             update_cluster_velocity_scores,
         )
         from tteuniyu_worker.embed import cosine_similarity, get_embedder
+
+        # --rebuild — 기존 clusters 전부 삭제 후 전체 재클러스터링 (TRUNCATE SQL 대체).
+        if args.rebuild:
+            deleted = asyncio.run(delete_all_clusters())
+            console.print(
+                f"[yellow]🔄 rebuild — 기존 cluster {deleted}개 삭제, 전체 재클러스터링[/yellow]"
+            )
 
         pending = asyncio.run(fetch_pending_articles(args.lookback_hours))
         if not pending:
