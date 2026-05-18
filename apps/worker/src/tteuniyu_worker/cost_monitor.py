@@ -21,12 +21,13 @@ logger = structlog.get_logger(__name__)
 DEFAULT_MONTHLY_CAP_USD = 50.0
 
 
-# Gemini 2.5 Flash 가격 (2026-05 기준 추정, 보수적).
-# Input — $0.30 / 1M tokens = $0.0003 / 1K
-# Output — $2.50 / 1M tokens = $0.0025 / 1K
-# 2.0 Flash 단종으로 2.5로 이전 — 비용 cap 보호 정확도 위해 상수 갱신.
-GEMINI_FLASH_INPUT_USD_PER_1K = 0.0003
-GEMINI_FLASH_OUTPUT_USD_PER_1K = 0.0025
+# Gemini 2.5 Flash-Lite 가격 (2026-05 기준 추정, 보수적).
+# Input — $0.10 / 1M tokens = $0.0001 / 1K
+# Output — $0.40 / 1M tokens = $0.0004 / 1K
+# 2.5 Flash는 thinking 토큰 과금으로 비용 폭증 — flash-lite로 이전.
+# 토큰 수는 usage_metadata 실측값 사용 (audit.extract_token_counts).
+GEMINI_FLASH_INPUT_USD_PER_1K = 0.0001
+GEMINI_FLASH_OUTPUT_USD_PER_1K = 0.0004
 
 
 class CostCapExceeded(RuntimeError):
