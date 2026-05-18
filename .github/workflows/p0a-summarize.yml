@@ -28,7 +28,7 @@ concurrency:
 jobs:
   summarize:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30  # 재클러스터링 후 대량 요약 (cluster당 ~6초) 여유
     defaults:
       run:
         working-directory: apps/worker
