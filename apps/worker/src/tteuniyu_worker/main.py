@@ -249,12 +249,14 @@ def cli() -> None:
     )
     sub_dig.add_argument("--dry-run", action="store_true", help="실 발송 X (stub backend 강제)")
 
-    # weekly-digest — Weekly Digest 발송 (mock subscribers, 현재 stub 전용)
+    # weekly-digest — Weekly Digest 발송 (mock subscribers + Resend or stub)
     sub_wdig = sub.add_parser(
         "weekly-digest",
-        help="Weekly Digest 발송 — mock subscribers (현재 stub 전용)",
+        help="Weekly Digest 발송 — mock subscribers (DIGEST_BACKEND=stub|resend)",
     )
-    sub_wdig.add_argument("--dry-run", action="store_true", help="실 발송 X (stub)")
+    sub_wdig.add_argument(
+        "--dry-run", action="store_true", help="실 발송 X (stub backend 강제)"
+    )
 
     # match-topics (ADR-018) — Custom Topic 매칭 cycle (mock or Supabase)
     sub_match = sub.add_parser(
@@ -415,11 +417,16 @@ def cli() -> None:
         sys.exit(0 if ok == len(results) else 1)
 
     if args.command == "weekly-digest":
+        import os as _os
+
         from tteuniyu_worker.digest import (
             mock_subscribers,
             mock_weekly_payload,
             send_weekly_to_all_subscribers,
         )
+
+        if args.dry_run:
+            _os.environ["DIGEST_BACKEND"] = "stub"
 
         subscribers = mock_subscribers()
         results = send_weekly_to_all_subscribers(subscribers, mock_weekly_payload)
