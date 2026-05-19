@@ -196,6 +196,39 @@ def test_send_weekly_to_all_subscribers_stub():
         assert r.message_id is not None
 
 
+def test_send_weekly_resend_backend_calls_resend(monkeypatch):
+    """DIGEST_BACKEND=resend + RESEND_API_KEY 있으면 _resend_post_email 호출."""
+    import tteuniyu_worker.digest as digest_mod
+
+    calls: list[dict] = []
+
+    def fake_post(**kwargs):
+        calls.append(kwargs)
+        return "msg-weekly-1", None
+
+    monkeypatch.setenv("DIGEST_BACKEND", "resend")
+    monkeypatch.setenv("RESEND_API_KEY", "re_test")
+    monkeypatch.setattr(digest_mod, "_resend_post_email", fake_post)
+
+    results = send_weekly_to_all_subscribers(mock_subscribers(), mock_weekly_payload)
+    assert len(calls) == len(results)
+    assert all(r.sent for r in results)
+    assert results[0].message_id == "msg-weekly-1"
+    # 주간 제목 — '이번 주 한국 이슈' + 기간
+    assert "이번 주 한국 이슈" in calls[0]["subject"]
+
+
+def test_send_weekly_resend_without_api_key_fails(monkeypatch):
+    """DIGEST_BACKEND=resend 인데 RESEND_API_KEY 없으면 실패 처리."""
+    monkeypatch.setenv("DIGEST_BACKEND", "resend")
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+
+    results = send_weekly_to_all_subscribers(mock_subscribers(), mock_weekly_payload)
+    for r in results:
+        assert r.sent is False
+        assert r.error == "RESEND_API_KEY missing"
+
+
 def test_editorial_auto_generated_when_empty():
     """editorial_paragraphs 비우면 첫 이슈 기반 1문단 자동 생성."""
     payload = WeeklyDigestPayload(

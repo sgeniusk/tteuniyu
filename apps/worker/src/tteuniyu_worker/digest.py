@@ -73,6 +73,52 @@ class StubDigestSender:
         )
 
 
+_RESEND_API_URL = "https://api.resend.com/emails"
+
+
+def _resend_post_email(
+    *,
+    api_key: str,
+    from_email: str,
+    to_email: str,
+    subject: str,
+    html: str,
+    text: str,
+    unsubscribe_url: str,
+) -> tuple[str | None, str | None]:
+    """Resend HTTP API 1건 발송 — (message_id, error) 반환. 예외는 error 문자열로.
+
+    Daily / Weekly digest 공용. 정통망법 §50 — List-Unsubscribe 헤더 포함.
+    """
+    body = json.dumps(
+        {
+            "from": from_email,
+            "to": [to_email],
+            "subject": subject,
+            "html": html,
+            "text": text,
+            # 정통망법 §50 — Unsubscribe header (1-click)
+            "headers": {
+                "List-Unsubscribe": f"<{unsubscribe_url}>",
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            },
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        _RESEND_API_URL,
+        data=body,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        response = urllib.request.urlopen(req, timeout=10)
+        return json.loads(response.read()).get("id"), None
+    except Exception as err:
+        return None, str(err)
+
+
 class ResendDigestSender:
     """Resend HTTP API 발송.
 
@@ -80,11 +126,11 @@ class ResendDigestSender:
     Env — RESEND_API_KEY, DIGEST_FROM_EMAIL (default 'noreply@tteuniyu.com')
     """
 
-    API_URL = "https://api.resend.com/emails"
+    API_URL = _RESEND_API_URL
 
     def __init__(self) -> None:
         self.api_key = os.getenv("RESEND_API_KEY")
-        self.from_email = os.getenv("DIGEST_FROM_EMAIL", "뜬 이유 <noreply@tteuniyu.com>")
+        self.from_email = os.getenv("DIGEST_FROM_EMAIL", "뜬이유 <noreply@tteuniyu.com>")
 
     def send(self, subscriber: DigestSubscriber, payload: DigestPayload) -> DigestSendResult:
         if not self.api_key:
@@ -100,56 +146,37 @@ class ResendDigestSender:
         text = render_digest_text(subscriber, payload)
         subject = f"🌅 어제 한국 이슈 다이제스트 — {payload.digest_date.strftime('%Y-%m-%d')}"
 
-        body = json.dumps(
-            {
-                "from": self.from_email,
-                "to": [subscriber.email],
-                "subject": subject,
-                "html": html,
-                "text": text,
-                # 정통망법 §50 — Unsubscribe header (1-click)
-                "headers": {
-                    "List-Unsubscribe": f"<{subscriber.unsubscribe_url}>",
-                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-                },
-            }
-        ).encode("utf-8")
-
-        req = urllib.request.Request(
-            self.API_URL,
-            data=body,
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
+        message_id, error = _resend_post_email(
+            api_key=self.api_key,
+            from_email=self.from_email,
+            to_email=subscriber.email,
+            subject=subject,
+            html=html,
+            text=text,
+            unsubscribe_url=subscriber.unsubscribe_url,
         )
-
-        try:
-            response = urllib.request.urlopen(req, timeout=10)
-            response_data = json.loads(response.read())
-            message_id = response_data.get("id")
-            logger.info(
-                "digest.resend.sent",
-                user_id=subscriber.user_id,
-                email=subscriber.email,
-                message_id=message_id,
-            )
-            return DigestSendResult(
-                user_id=subscriber.user_id,
-                email=subscriber.email,
-                sent=True,
-                message_id=message_id,
-                cluster_count=len(payload.clusters),
-                custom_topic_matches=len(payload.custom_topic_matches),
-            )
-        except Exception as err:
-            logger.error("digest.resend.failed", error=str(err), user_id=subscriber.user_id)
+        if error:
+            logger.error("digest.resend.failed", error=error, user_id=subscriber.user_id)
             return DigestSendResult(
                 user_id=subscriber.user_id,
                 email=subscriber.email,
                 sent=False,
-                error=str(err),
+                error=error,
             )
+        logger.info(
+            "digest.resend.sent",
+            user_id=subscriber.user_id,
+            email=subscriber.email,
+            message_id=message_id,
+        )
+        return DigestSendResult(
+            user_id=subscriber.user_id,
+            email=subscriber.email,
+            sent=True,
+            message_id=message_id,
+            cluster_count=len(payload.clusters),
+            custom_topic_matches=len(payload.custom_topic_matches),
+        )
 
 
 def get_sender() -> StubDigestSender | ResendDigestSender:
@@ -313,13 +340,23 @@ def send_weekly_to_all_subscribers(
     subscribers: list[DigestSubscriber],
     payload_builder: Any,  # callable subscriber → WeeklyDigestPayload
 ) -> list[DigestSendResult]:
-    """Weekly Digest 발송. 현재 stub(콘솔 출력)만 — 실 Resend 발송은 후속 티켓.
+    """Weekly Digest 발송 — DIGEST_BACKEND=resend 시 실 발송, 아니면 stub.
 
-    Daily와 backend 분리 — DIGEST_BACKEND=resend 여도 weekly는 아직 stub 강제.
+    Daily와 동일 env(DIGEST_BACKEND / RESEND_API_KEY / DIGEST_FROM_EMAIL).
     """
     from tteuniyu_worker.weekly_digest_template import (
         render_weekly_digest_html,
         render_weekly_digest_text,
+    )
+
+    backend = os.getenv("DIGEST_BACKEND", "stub").lower()
+    api_key = os.getenv("RESEND_API_KEY")
+    from_email = os.getenv("DIGEST_FROM_EMAIL", "뜬이유 <noreply@tteuniyu.com>")
+    use_resend = backend == "resend" and bool(api_key)
+    logger.info(
+        "weekly_digest.backend",
+        choice="resend" if use_resend else "stub",
+        api_key_present=bool(api_key),
     )
 
     results: list[DigestSendResult] = []
@@ -327,11 +364,67 @@ def send_weekly_to_all_subscribers(
         payload = payload_builder(subscriber)
         html = render_weekly_digest_html(subscriber, payload)
         text = render_weekly_digest_text(subscriber, payload)
+        issue_count = len(payload.issues)
+
+        if use_resend:
+            start, end = payload.period_start, payload.period_end
+            subject = (
+                f"📰 이번 주 한국 이슈 — "
+                f"{start.month}/{start.day}~{end.month}/{end.day}"
+            )
+            message_id, error = _resend_post_email(
+                api_key=api_key,  # type: ignore[arg-type]
+                from_email=from_email,
+                to_email=subscriber.email,
+                subject=subject,
+                html=html,
+                text=text,
+                unsubscribe_url=subscriber.unsubscribe_url,
+            )
+            if error:
+                logger.error(
+                    "weekly_digest.resend.failed",
+                    error=error,
+                    user_id=subscriber.user_id,
+                )
+            else:
+                logger.info(
+                    "weekly_digest.resend.sent",
+                    user_id=subscriber.user_id,
+                    email=subscriber.email,
+                    message_id=message_id,
+                )
+            results.append(
+                DigestSendResult(
+                    user_id=subscriber.user_id,
+                    email=subscriber.email,
+                    sent=error is None,
+                    message_id=message_id,
+                    cluster_count=issue_count,
+                    error=error,
+                )
+            )
+            continue
+
+        # stub — backend=resend 인데 api_key 없으면 실패 처리.
+        if backend == "resend":
+            logger.error("weekly_digest.resend.no_api_key", user_id=subscriber.user_id)
+            results.append(
+                DigestSendResult(
+                    user_id=subscriber.user_id,
+                    email=subscriber.email,
+                    sent=False,
+                    cluster_count=issue_count,
+                    error="RESEND_API_KEY missing",
+                )
+            )
+            continue
+
         logger.info(
             "weekly_digest.stub.send",
             user_id=subscriber.user_id,
             email=subscriber.email,
-            issue_count=len(payload.issues),
+            issue_count=issue_count,
             category_flows=len(payload.category_flows),
             html_chars=len(html),
             text_chars=len(text),
@@ -342,7 +435,7 @@ def send_weekly_to_all_subscribers(
                 email=subscriber.email,
                 sent=True,
                 message_id=f"stub-weekly-{subscriber.user_id}",
-                cluster_count=len(payload.issues),
+                cluster_count=issue_count,
             )
         )
     return results
