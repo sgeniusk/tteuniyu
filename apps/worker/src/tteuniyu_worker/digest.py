@@ -18,7 +18,7 @@ import os
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -29,6 +29,9 @@ from tteuniyu_worker.digest_template import (
     render_digest_html,
     render_digest_text,
 )
+
+if TYPE_CHECKING:
+    from tteuniyu_worker.weekly_digest_template import WeeklyDigestPayload
 
 logger = structlog.get_logger(__name__)
 
@@ -228,3 +231,118 @@ def mock_payload(subscriber: DigestSubscriber) -> DigestPayload:
         if subscriber.include_custom_topics
         else [],
     )
+
+
+# ─── Weekly Digest — mock payload + 발송 (stub) ───────────────
+
+
+def mock_weekly_payload(subscriber: DigestSubscriber) -> WeeklyDigestPayload:
+    """CI/dev/dry-run용 가짜 Weekly payload — Claude Design 시안 샘플 데이터."""
+    from datetime import timedelta
+
+    from tteuniyu_worker.weekly_digest_template import (
+        CategoryFlow,
+        WeeklyDigestPayload,
+        WeeklyIssueCard,
+    )
+
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(days=7)
+    return WeeklyDigestPayload(
+        period_start=start,
+        period_end=end,
+        issue_no=1,
+        total_articles=1247,
+        editorial_paragraphs=[
+            "이번 주 한국 언론은 삼성전자 노사 갈등을 주 내내 1면에서 다뤘습니다. "
+            "월요일 협상이 시작될 때만 해도 통상적인 임단협 국면이었지만, 수요일 "
+            "결렬과 함께 정부 개입 신호가 더해지며 주간 최대 사안이 됐습니다.",
+            "주 후반에는 코스피 급락과 맞물리며 경제 불안 정서가 빠르게 번졌습니다. "
+            "노사 이슈를 단독 사안으로 다루던 매체들도 금요일을 기점으로 함께 묶어 "
+            "분석하기 시작했습니다.",
+            "외교에서는 한미 정상 통화가 변수로 등장했습니다. 통화 직후 공개된 "
+            "팩트시트의 해석을 두고 매체별 결이 갈렸습니다.",
+        ],
+        issues=[
+            WeeklyIssueCard(
+                cluster_id="00000000-0000-4000-8000-000000000010",
+                title="삼성전자 노사 갈등",
+                category="politics",
+                weekly_outlets_count=38,
+                timeline=[("월", "협상 시작"), ("수", "결렬"), ("금", "중노위 개입")],
+            ),
+            WeeklyIssueCard(
+                cluster_id="00000000-0000-4000-8000-000000000011",
+                title="코스피 급락·셀코리아",
+                category="economy",
+                weekly_outlets_count=29,
+                timeline=[("화", "하락 시작"), ("금", "7443 마감")],
+            ),
+            WeeklyIssueCard(
+                cluster_id="00000000-0000-4000-8000-000000000012",
+                title="한미 정상 통화",
+                category="international",
+                weekly_outlets_count=22,
+                timeline=[("목", "통화"), ("금", "팩트시트 공개")],
+            ),
+            WeeklyIssueCard(
+                cluster_id="00000000-0000-4000-8000-000000000013",
+                title="전세사기 특별법 후속 논의",
+                category="society",
+                weekly_outlets_count=18,
+                timeline=[("월", "기자회견"), ("", "주 내내 후속")],
+            ),
+            WeeklyIssueCard(
+                cluster_id="00000000-0000-4000-8000-000000000014",
+                title="국민연금 개편안 윤곽",
+                category="economy",
+                weekly_outlets_count=15,
+                timeline=[("수", "윤곽 공개"), ("", "주말 찬반 논쟁")],
+            ),
+        ],
+        category_flows=[
+            CategoryFlow(category="politics", percent=42, article_count=524),
+            CategoryFlow(category="economy", percent=31, article_count=387),
+            CategoryFlow(category="society", percent=15, article_count=187),
+            CategoryFlow(category="international", percent=12, article_count=149),
+        ],
+    )
+
+
+def send_weekly_to_all_subscribers(
+    subscribers: list[DigestSubscriber],
+    payload_builder: Any,  # callable subscriber → WeeklyDigestPayload
+) -> list[DigestSendResult]:
+    """Weekly Digest 발송. 현재 stub(콘솔 출력)만 — 실 Resend 발송은 후속 티켓.
+
+    Daily와 backend 분리 — DIGEST_BACKEND=resend 여도 weekly는 아직 stub 강제.
+    """
+    from tteuniyu_worker.weekly_digest_template import (
+        render_weekly_digest_html,
+        render_weekly_digest_text,
+    )
+
+    results: list[DigestSendResult] = []
+    for subscriber in subscribers:
+        payload = payload_builder(subscriber)
+        html = render_weekly_digest_html(subscriber, payload)
+        text = render_weekly_digest_text(subscriber, payload)
+        logger.info(
+            "weekly_digest.stub.send",
+            user_id=subscriber.user_id,
+            email=subscriber.email,
+            issue_count=len(payload.issues),
+            category_flows=len(payload.category_flows),
+            html_chars=len(html),
+            text_chars=len(text),
+        )
+        results.append(
+            DigestSendResult(
+                user_id=subscriber.user_id,
+                email=subscriber.email,
+                sent=True,
+                message_id=f"stub-weekly-{subscriber.user_id}",
+                cluster_count=len(payload.issues),
+            )
+        )
+    return results
