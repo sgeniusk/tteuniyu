@@ -25,7 +25,8 @@ on:
           - cluster-pending
   # T-006 Step 4 cron 활성화 — 매 시간 정각 ingest (cluster 자동화는 PR #48에서).
   schedule:
-    - cron: '0 * * * *'  # 매 시간 정각 (UTC)
+    # 테스트 단계 — 야간 휴식 + 주간 저빈도. UTC 0/4/8/12 = 한국 09/13/17/21시.
+    - cron: '0 0,4,8,12 * * *'
 
 # 동일 워크플로우 동시 실행 방지 (cron 중복 방지)
 concurrency:
