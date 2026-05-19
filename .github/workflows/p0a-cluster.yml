@@ -23,7 +23,8 @@ on:
         type: boolean
         default: false
   schedule:
-    - cron: '30 * * * *'  # 매 시간 30분 (UTC)
+    # 테스트 단계 — 야간 휴식 + 주간 저빈도. ingest(정각) 30분 후 클러스터링.
+    - cron: '30 0,4,8,12 * * *'
 
 # 동일 워크플로우 동시 실행 방지
 concurrency:

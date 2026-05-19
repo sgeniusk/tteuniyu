@@ -19,7 +19,8 @@ on:
         required: false
         default: '30'
   schedule:
-    - cron: '45 * * * *'  # 매 시간 45분 (UTC)
+    # 테스트 단계 — 야간 휴식 + 주간 저빈도. cluster(30분) 15분 후 요약.
+    - cron: '45 0,4,8,12 * * *'
 
 concurrency:
   group: p0a-summarize
