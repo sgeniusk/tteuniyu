@@ -86,25 +86,26 @@ def test_html_includes_unsubscribe_link():
     assert sub.unsubscribe_url in html
 
 
-def test_html_includes_brand_뜬_이유():
-    """헤더에 '뜬 이유' 브랜드 표시."""
+def test_html_includes_brand_뜬이유():
+    """헤더에 '뜬이유' 브랜드 표시 (v2 — 붙여쓰기)."""
     html = render_digest_html(_make_subscriber(), _make_payload())
-    assert "뜬 이유" in html
+    assert "뜬이유" in html
 
 
-def test_html_includes_pretendard_font():
-    """Korean 가독성 — Pretendard inline."""
+def test_html_uses_email_safe_system_font():
+    """v2 — 이메일은 webfont 불가. 시스템 폰트 스택만 사용 (Pretendard X)."""
     html = render_digest_html(_make_subscriber(), _make_payload())
-    assert "Pretendard" in html
+    assert "-apple-system" in html
+    assert "Pretendard" not in html
 
 
-def test_html_investment_notice_only_when_investment_tag():
-    """변호사 §1.4 — 투자 관련 cluster 있을 때만 자본시장법 고지."""
+def test_html_investment_notice_always_present():
+    """변호사 §1.4 — v2는 footer에 자본시장법 고지를 상시 노출 (always-on, 더 안전)."""
     no_invest = render_digest_html(_make_subscriber(), _make_payload(trust_tag=None))
-    assert "투자 자문이 아니며" not in no_invest
+    assert "투자 자문이 아닙니다" in no_invest
 
     with_invest = render_digest_html(_make_subscriber(), _make_payload(trust_tag="investment"))
-    assert "투자 자문이 아니며" in with_invest
+    assert "투자 자문이 아닙니다" in with_invest
 
 
 def test_html_includes_lawyer_mandated_label_when_trust_tag():
@@ -119,8 +120,8 @@ def test_html_custom_topic_section_only_when_subscriber_opts_in():
     sub_no = _make_subscriber(include_topics=False)
     html_yes = render_digest_html(sub_yes, payload)
     html_no = render_digest_html(sub_no, payload)
-    assert "추적 중인 키워드 매칭" in html_yes
-    assert "추적 중인 키워드 매칭" not in html_no
+    assert "내 관심 토픽" in html_yes
+    assert "내 관심 토픽" not in html_no
 
 
 def test_html_html_escapes_user_content():
