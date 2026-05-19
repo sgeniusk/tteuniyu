@@ -249,6 +249,13 @@ def cli() -> None:
     )
     sub_dig.add_argument("--dry-run", action="store_true", help="실 발송 X (stub backend 강제)")
 
+    # weekly-digest — Weekly Digest 발송 (mock subscribers, 현재 stub 전용)
+    sub_wdig = sub.add_parser(
+        "weekly-digest",
+        help="Weekly Digest 발송 — mock subscribers (현재 stub 전용)",
+    )
+    sub_wdig.add_argument("--dry-run", action="store_true", help="실 발송 X (stub)")
+
     # match-topics (ADR-018) — Custom Topic 매칭 cycle (mock or Supabase)
     sub_match = sub.add_parser(
         "match-topics",
@@ -401,6 +408,29 @@ def cli() -> None:
             console.print(
                 f"  {status} {r.email} — clusters={r.cluster_count}, "
                 f"topic_matches={r.custom_topic_matches}, "
+                f"message_id={r.message_id or '-'}"
+            )
+            if r.error:
+                console.print(f"     [red]error: {r.error}[/red]")
+        sys.exit(0 if ok == len(results) else 1)
+
+    if args.command == "weekly-digest":
+        from tteuniyu_worker.digest import (
+            mock_subscribers,
+            mock_weekly_payload,
+            send_weekly_to_all_subscribers,
+        )
+
+        subscribers = mock_subscribers()
+        results = send_weekly_to_all_subscribers(subscribers, mock_weekly_payload)
+        ok = sum(1 for r in results if r.sent)
+        console.print(
+            f"[green]✅ weekly-digest — {ok}/{len(results)} subscribers (mock)[/green]"
+        )
+        for r in results:
+            status = "✅" if r.sent else "❌"
+            console.print(
+                f"  {status} {r.email} — issues={r.cluster_count}, "
                 f"message_id={r.message_id or '-'}"
             )
             if r.error:
